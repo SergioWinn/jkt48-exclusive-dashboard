@@ -228,8 +228,10 @@ def live_dashboard_fragment(
 
     event_stats = calculate_event_stats(event_data, member_metadata)
     summary = event_stats["summary"]
+    sales_data_available = event_stats["sales_data_available"]
+    st.session_state[f"sales_stats_available_{event_code}"] = sales_data_available
 
-    with st.container(border=False, key="summary_metrics"):
+    if sales_data_available:
         st.markdown(
             f"""
             <div class="metrics-scope">Entire event totals</div>
@@ -259,6 +261,8 @@ def live_dashboard_fragment(
             """,
             unsafe_allow_html=True,
         )
+    else:
+        st.info("JKT48 saat ini hanya mengirim status AVAILABLE / SOLD OUT. Jumlah Sold tidak tersedia dari API.")
 
     render_event_cards(event_data, search_query, nickname_map, photo_map, available_only, is_event_closed)
     render_stats_payload(
@@ -266,7 +270,7 @@ def live_dashboard_fragment(
             "Member": table_rows(event_stats["members"]),
             "Generation": table_rows(event_stats["generations"], include_members=True),
             "Team": table_rows(event_stats["teams"], include_members=True),
-        },
+        } if sales_data_available else {},
         f"{event_data.get('title', 'Event')} statistics",
         photo_map,
     )
@@ -350,7 +354,8 @@ if available_categories:
         tuple(event.get("code") for event in active_events if event.get("code")),
     )
 
-    render_stats_controls(can_share=is_admin)
+    if st.session_state.get(f"sales_stats_available_{selected_event_code}"):
+        render_stats_controls(can_share=is_admin)
 
     if is_admin:
         render_share_controls(f"share_selection_{selected_event.get('code', 'unknown')}")

@@ -85,6 +85,12 @@ def _as_int(value):
         return 0
 
 
+def _is_available(detail):
+    if "quota_available" in detail:
+        return bool(detail["quota_available"])
+    return _as_int(detail.get("available_quota")) > 0
+
+
 def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, available_only, is_event_closed=False):
     # PERBAIKAN BUG: Samakan variabel parameter dengan yang dipakai di dalam fungsi
     event_data = fresh_event_data 
@@ -162,7 +168,7 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
             # Jika mode available dihidupkan, dan event tutup, langsung sembunyikan semua
             if not is_before_deadline or is_event_closed:
                 continue
-            members = [m for m in members if _as_int(m.get('available_quota')) > 0]
+            members = [m for m in members if _is_available(m)]
 
         if not members:
             continue
@@ -279,6 +285,8 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
             member_name = str(m.get('jkt48_member_name') or 'Unknown')
             current_quota = _as_int(m.get('available_quota'))
             tickets_sold = _as_int(m.get('tickets_sold'))
+            has_ticket_counts = 'tickets_sold' in m and 'available_quota' in m
+            is_available = _is_available(m)
             jalur_label = str(m.get("label", "-"))
             jalur_title = jalur_label
             
@@ -312,11 +320,13 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
             if is_event_closed or not is_before_deadline:
                 cls = "closed"
                 btn_text = "CLOSED"
-            elif current_quota <= 0:
+            elif not is_available:
                 cls, btn_text = "sold", "SOLD&nbsp;OUT"
                 sold_percentage = 100
-            elif current_quota < warn_limit:
+            elif has_ticket_counts and current_quota < warn_limit:
                 cls, btn_text = "warn", f"{current_quota}&nbsp;LEFT"
+            elif not has_ticket_counts:
+                cls, btn_text = "avail", "AVAILABLE"
             else:
                 cls, btn_text = "avail", f"{current_quota}&nbsp;LEFT"
 
@@ -337,9 +347,14 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
                 initials = ''.join(part[0] for part in member_name.split()[:2]).upper() or '?'
                 img_html = f'<div class="c-photo c-photo-placeholder" aria-hidden="true">{escape(initials)}</div>'
                                         
+            sales_label = (
+                f"Sold:&nbsp;<b>{tickets_sold}</b>"
+                if has_ticket_counts
+                else f"Status:&nbsp;<b>{'AVAILABLE' if is_available else 'SOLD OUT'}</b>"
+            )
             combined_ui = f"""
             <div class="c-stats">
-                <span>Sold:&nbsp;<b>{tickets_sold}</b></span>
+                <span>{sales_label}</span>
             </div>
             <div class="c-prog-btn">
                 <div class="c-prog-fill" style="transform: scaleX({max(0, min(100, sold_percentage)) / 100:.4f});"></div>
@@ -353,7 +368,7 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
             
             card_html = ""
             # Jika sudah habis ATAU lewat deadline sesi ATAU event tutup total, matikan link <a>
-            if current_quota <= 0 or not is_before_deadline or is_event_closed: 
+            if not is_available or not is_before_deadline or is_event_closed:
                 card_html += (
                     f'<div class="ldp-card {cls}" {share_attributes}>'
                      f'<div class="c-jalur" title="{escape(jalur_title, quote=True)}">{display_jalur}</div>'

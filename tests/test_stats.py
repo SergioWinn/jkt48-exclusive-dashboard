@@ -42,6 +42,7 @@ class EventStatsTest(unittest.TestCase):
         stats = calculate_event_stats(event, metadata)
 
         self.assertEqual(stats["summary"]["sold"], 23)
+        self.assertTrue(stats["sales_data_available"])
         self.assertEqual(stats["summary"]["remaining"], 7)
         self.assertEqual(stats["summary"]["revenue"], 2760000)
         self.assertEqual(stats["summary"]["potential_revenue"], 3600000)
@@ -82,6 +83,13 @@ class EventStatsTest(unittest.TestCase):
         self.assertEqual(stats["summary"]["sold_rate"], 0.0)
         self.assertEqual(stats["generations"][0]["name"], "Unknown")
         self.assertEqual(stats["teams"][0]["name"], "Unknown")
+
+    def test_availability_only_api_does_not_claim_zero_sales(self):
+        stats = calculate_event_stats({
+            "session": [{"session_detail": [{"jkt48_member_name": "A", "quota_available": False}]}],
+        })
+
+        self.assertFalse(stats["sales_data_available"])
 
     def test_table_rows_format_money_percentage_and_members(self):
         rows = table_rows([

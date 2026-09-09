@@ -284,9 +284,7 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
         for m in members:
             member_name = str(m.get('jkt48_member_name') or 'Unknown')
             current_quota = _as_int(m.get('available_quota'))
-            tickets_sold = _as_int(m.get('tickets_sold'))
             has_remaining = m.get('available_quota') is not None
-            has_ticket_counts = m.get('tickets_sold') is not None and has_remaining
             is_available = _is_available(m)
             jalur_label = str(m.get("label", "-"))
             jalur_title = jalur_label
@@ -314,8 +312,6 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
             share_member_name = escape(member_name, quote=True)
             share_attributes = f'data-share-session="{session_share_key}" data-share-session-label="{session_share_label}" data-share-member="{share_member_name}"'
             
-            total_slot_capacity = tickets_sold + current_quota
-            sold_percentage = (tickets_sold / total_slot_capacity * 100) if total_slot_capacity > 0 else 0
             
            # --- LOGIKA TEMA CARD TERPADU (CLOSED / SOLD OUT / LOW / AVAILABLE) ---
             if is_event_closed or not is_before_deadline:
@@ -323,7 +319,6 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
                 btn_text = "CLOSED"
             elif not is_available:
                 cls, btn_text = "sold", "SOLD&nbsp;OUT"
-                sold_percentage = 100
             elif has_remaining and current_quota < warn_limit:
                 cls, btn_text = "warn", f"{current_quota}&nbsp;LEFT"
             elif not has_remaining:
@@ -349,9 +344,7 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
                 img_html = f'<div class="c-photo c-photo-placeholder" aria-hidden="true">{escape(initials)}</div>'
                                         
             sales_label = (
-                f"Sold:&nbsp;<b>{tickets_sold}</b>"
-                if has_ticket_counts
-                else f"Remaining:&nbsp;<b>{current_quota}</b>" if has_remaining
+                f"Remaining:&nbsp;<b>{current_quota}</b>" if has_remaining
                 else f"Status:&nbsp;<b>{'AVAILABLE' if is_available else 'SOLD OUT'}</b>"
             )
             combined_ui = f"""
@@ -359,7 +352,6 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
                 <span>{sales_label}</span>
             </div>
             <div class="c-prog-btn">
-                <div class="c-prog-fill" style="transform: scaleX({max(0, min(100, sold_percentage)) / 100:.4f});"></div>
                 <div class="c-prog-text">{btn_text}</div>
             </div>
             """

@@ -268,7 +268,7 @@ def live_dashboard_fragment(
             unsafe_allow_html=True,
         )
     else:
-        st.info("JKT48 saat ini hanya mengirim status AVAILABLE / SOLD OUT. Jumlah Sold tidak tersedia dari API.")
+        st.info("Jumlah terjual tidak tersedia dari API. Kartu menampilkan sisa stok jika tersedia, atau status ketersediaan.")
 
     render_event_cards(event_data, search_query, nickname_map, photo_map, available_only, is_event_closed)
     render_stats_payload(

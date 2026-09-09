@@ -156,8 +156,42 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
             details = list(executor.map(fetch_exclusive_detail, ["EXSHARED"] * 20))
 
         self.assertEqual(details, [live_detail] * 20)
-        self.assertEqual(get_json.call_count, 1)
+        self.assertEqual(get_json.call_count, 2)
         self.assertEqual(set_status.call_count, 20)
+
+    @patch("core.api._write_cache")
+    @patch("core.api._get_json")
+    def test_bonus_stock_overrides_matching_slots_and_falls_back(self, get_json, write_cache):
+        member = {"label": "Jalur 1", "jkt48_member_name": "Jacqueline Immanuela",
+                  "tickets_sold": 10, "available_quota": 35, "quota_available": True}
+        session = {"date": "2026-09-13", "start_time": "11:45:00", "label": "Sesi 1",
+                   "session_detail": [member]}
+        original = {"code": "EX5A08", "default_price": 120000, "session": [
+            session, {**session, "date": "2026-09-14"},
+        ]}
+        bonus = {"date": "2026-09-13", "start_time": "11:45:00", "label": "Sesi 1",
+                 "session_members": [{"label": "Jalur 1", "member_name": "Jacqueline Immanuela",
+                                      "available_quota": 0}]}
+        for response in ({"status": True, "data": [bonus]},
+                         LiveApiUnavailable("HTTP 404"), LiveApiUnavailable("HTTP 429"),
+                         {"status": True, "data": []}, {"status": True, "data": None},
+                         {"status": True, "data": [bonus, {"session_members": [None]}]}):
+            with self.subTest(response=response):
+                clear_exclusive_detail_cache()
+                get_json.side_effect = [{"status": True, "data": original}, response]
+                detail = fetch_exclusive_detail("EX5A08")
+                self.assertEqual(get_json.call_args.args[0], "https://jkt48.com/api/v1/exclusives/EX5A08/bonus?lang=id")
+                if isinstance(response, dict) and response.get("data") == [bonus]:
+                    updated = detail["session"][0]["session_detail"][0]
+                    self.assertEqual(updated["available_quota"], 0)
+                    self.assertFalse(updated["quota_available"])
+                    self.assertEqual(updated["tickets_sold"], 10)
+                    self.assertEqual(detail["session"][1], original["session"][1])
+                    self.assertEqual(detail["default_price"], 120000)
+                    self.assertEqual(member["available_quota"], 35)
+                else:
+                    self.assertEqual(detail, original)
+                self.assertEqual(write_cache.call_args.args[1]["data"], detail)
 
     def test_every_known_event_has_bundled_detail(self):
         project_root = Path(__file__).parent.parent

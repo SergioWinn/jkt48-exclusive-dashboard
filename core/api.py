@@ -273,6 +273,36 @@ def get_active_exclusive_events():
         return KNOWN_EXCLUSIVE_EVENTS.copy()
 
 
+def _apply_bonus_stock(data, bonus_sessions):
+    if not isinstance(bonus_sessions, list):
+        raise LiveApiUnavailable("Invalid bonus sessions")
+    stock = {}
+    for session in bonus_sessions:
+        if not isinstance(session, dict) or not isinstance(session.get("session_members"), list):
+            raise LiveApiUnavailable("Invalid bonus session")
+        for member in session["session_members"]:
+            if not isinstance(member, dict):
+                raise LiveApiUnavailable("Invalid bonus member")
+            quota = member.get("available_quota")
+            identity = (session.get("date"), session.get("start_time"), session.get("label"),
+                        member.get("label"), member.get("member_name"))
+            if not all(isinstance(value, str) and value for value in identity) or type(quota) is not int or quota < 0:
+                raise LiveApiUnavailable("Invalid bonus stock")
+            stock[identity] = quota
+
+    sessions = []
+    for session in data.get("session", []):
+        details = []
+        for member in session.get("session_detail", []):
+            identity = (session.get("date"), session.get("start_time"), session.get("label"),
+                        member.get("label"), member.get("jkt48_member_name"))
+            if identity in stock:
+                member = {**member, "available_quota": stock[identity], "quota_available": stock[identity] > 0}
+            details.append(member)
+        sessions.append({**session, "session_detail": details})
+    return {**data, "session": sessions}
+
+
 @st.cache_data(ttl=4, show_spinner=False)
 def _fetch_exclusive_detail_shared(code):
     url = f"https://jkt48.com/api/v1/exclusives/{code}?lang=id"
@@ -286,6 +316,11 @@ def _fetch_exclusive_detail_shared(code):
         data = res_json.get("data")
         if not isinstance(data, dict) or not data.get("code"):
             raise LiveApiUnavailable("Exclusive detail is missing")
+        try:
+            bonus = _get_json(f"https://jkt48.com/api/v1/exclusives/{code}/bonus?lang=id", 12)
+            data = _apply_bonus_stock(data, bonus.get("data"))
+        except LiveApiUnavailable:
+            pass  # Bonus may be unavailable after sales close; keep the regular API detail.
         _write_cache(cache_file, {"last_updated": waktu_sekarang, "data": data})
         return {
             "data": data,

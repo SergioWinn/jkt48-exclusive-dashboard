@@ -193,6 +193,59 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
                     self.assertEqual(detail, original)
                 self.assertEqual(write_cache.call_args.args[1]["data"], detail)
 
+    @patch("core.api._set_wr_status")
+    @patch("core.api._write_cache")
+    @patch("core.api._read_cache")
+    @patch("core.api._get_json")
+    def test_bonus_refreshes_cached_stock_when_detail_is_rate_limited(self, get_json, read_cache, write_cache, status):
+        cached = {"code": "EX5A08", "session": [{
+            "date": "2026-09-13T00:00:00", "start_time": "11:45", "label": "Session 1 (Sunday)",
+            "session_detail": [{"label": "Jalur 1", "jkt48_member_name": "Jacqueline Immanuela",
+                                "quota_available": False}],
+        }]}
+        read_cache.return_value = {"data": cached, "last_updated": "old metadata"}
+        bonus = {"status": True, "data": [{
+            "date": "2026-09-13", "start_time": "11:45:00", "label": "Sesi 1",
+            "session_members": [{"label": "Jalur 1", "member_name": "Jacqueline Immanuela", "available_quota": 9}],
+        }]}
+        for response in (bonus, LiveApiUnavailable("HTTP 429")):
+            with self.subTest(response=response):
+                clear_exclusive_detail_cache()
+                get_json.side_effect = [LiveApiUnavailable("HTTP 429"), response]
+                data = fetch_exclusive_detail("EX5A08")
+                self.assertIn("/bonus?lang=id", get_json.call_args.args[0])
+                if response is bonus:
+                    self.assertTrue(status.call_args.args[1])
+                    member = data["session"][0]["session_detail"][0]
+                    self.assertEqual(member["available_quota"], 9)
+                    self.assertTrue(member["quota_available"])
+                    self.assertNotIn("tickets_sold", member)
+                    self.assertEqual(status.call_args.args[3], "")
+                    self.assertEqual(write_cache.call_args.args[1]["data"], data)
+                else:
+                    self.assertFalse(status.call_args.args[1])
+                    self.assertEqual(data, cached)
+
+    @patch("core.api._set_wr_status")
+    @patch("core.api._write_cache")
+    @patch("core.api._read_cache", return_value=None)
+    @patch("core.api._get_json")
+    def test_new_event_stock_works_without_detail_or_cache(self, get_json, read_cache, write_cache, status):
+        get_json.side_effect = [LiveApiUnavailable("HTTP 429"), {"status": True, "data": [{
+            "exclusive_session_code": "EX5A08-SNCCF4", "date": "2026-09-13",
+            "start_time": "11:45:00", "end_time": "12:45:00", "label": "Sesi 1",
+            "session_members": [{"label": "Jalur 1", "member_name": "Jacqueline Immanuela",
+                                 "session_detail_code": "EX5A08-SNCCF4-SD3017", "available_quota": 6}],
+        }]}]
+        data = fetch_exclusive_detail("EX5A08")
+        self.assertEqual(data["code"], "EX5A08")
+        member = data["session"][0]["session_detail"][0]
+        self.assertEqual(member["jkt48_member_name"], "Jacqueline Immanuela")
+        self.assertEqual(member["available_quota"], 6)
+        self.assertNotIn("tickets_sold", member)
+        self.assertTrue(status.call_args.args[1])
+        self.assertEqual(write_cache.call_args.args[1]["data"], data)
+
     def test_every_known_event_has_bundled_detail(self):
         project_root = Path(__file__).parent.parent
 

@@ -161,6 +161,7 @@ def live_dashboard_fragment(
         st.session_state[attempt_state_key] = time.monotonic()
         fetched_event_data = fetch_exclusive_detail(event_code)
         if fetched_event_data:
+            fetched_event_data = {**selected_event, **fetched_event_data}
             st.session_state[event_state_key] = fetched_event_data
             event_data = fetched_event_data
 
@@ -228,6 +229,9 @@ def live_dashboard_fragment(
     if is_admin and is_waiting_room_detected():
         if st.button("Mitigate Waiting Room", icon=":material/key:", key=f"wr_cookie_{event_code}"):
             show_jkt48_cookie_dialog()
+
+    if wr_info.get("is_live") and wr_info.get("reason"):
+        st.info(f"Sisa stok bonus belum berhasil dimuat ({wr_info['reason']}). Menampilkan data API utama.")
 
     if not has_event_detail:
         return

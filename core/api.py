@@ -273,34 +273,47 @@ def get_active_exclusive_events():
         return KNOWN_EXCLUSIVE_EVENTS.copy()
 
 
+def _bonus_stock_key(session, label, member_name):
+    return (str(session.get("date") or "")[:10], str(session.get("start_time") or "")[:5],
+            str(label or "").strip().casefold(), str(member_name or "").strip().casefold())
+
+
 def _apply_bonus_stock(data, bonus_sessions):
-    if not isinstance(bonus_sessions, list):
+    if not isinstance(bonus_sessions, list) or not bonus_sessions:
         raise LiveApiUnavailable("Invalid bonus sessions")
-    stock = {}
+    sessions = {
+        _bonus_stock_key(session, "", "")[:2]: session
+        for session in data.get("session", [])
+    }
+    has_stock = False
     for session in bonus_sessions:
         if not isinstance(session, dict) or not isinstance(session.get("session_members"), list):
             raise LiveApiUnavailable("Invalid bonus session")
+        session_key = _bonus_stock_key(session, "", "")[:2]
+        previous = sessions.get(session_key, {})
+        members = {
+            _bonus_stock_key(previous, member.get("label"), member.get("jkt48_member_name")): member
+            for member in previous.get("session_detail", [])
+        }
         for member in session["session_members"]:
             if not isinstance(member, dict):
                 raise LiveApiUnavailable("Invalid bonus member")
             quota = member.get("available_quota")
-            identity = (session.get("date"), session.get("start_time"), session.get("label"),
-                        member.get("label"), member.get("member_name"))
+            identity = _bonus_stock_key(session, member.get("label"), member.get("member_name"))
             if not all(isinstance(value, str) and value for value in identity) or type(quota) is not int or quota < 0:
                 raise LiveApiUnavailable("Invalid bonus stock")
-            stock[identity] = quota
-
-    sessions = []
-    for session in data.get("session", []):
-        details = []
-        for member in session.get("session_detail", []):
-            identity = (session.get("date"), session.get("start_time"), session.get("label"),
-                        member.get("label"), member.get("jkt48_member_name"))
-            if identity in stock:
-                member = {**member, "available_quota": stock[identity], "quota_available": stock[identity] > 0}
-            details.append(member)
-        sessions.append({**session, "session_detail": details})
-    return {**data, "session": sessions}
+            has_stock = True
+            members[identity] = {
+                **members.get(identity, {}), **member,
+                "jkt48_member_name": member["member_name"], "quota_available": quota > 0,
+            }
+        sessions[session_key] = {
+            **previous, **{key: value for key, value in session.items() if key != "session_members"},
+            "session_detail": list(members.values()),
+        }
+    if not has_stock:
+        raise LiveApiUnavailable("Bonus stock is empty")
+    return {**data, "session": list(sessions.values())}
 
 
 @st.cache_data(ttl=4, show_spinner=False)
@@ -310,49 +323,31 @@ def _fetch_exclusive_detail_shared(code):
     bundled_cache_file = os.path.join("data", "fallback", f"{code}.json")
     now_wib = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
     waktu_sekarang = now_wib.strftime('%d/%m/%Y %H:%M:%S WIB')
-
+    is_live, reason, time_label = True, "", waktu_sekarang
     try:
         res_json = _get_json(url, 12)
         data = res_json.get("data")
         if not isinstance(data, dict) or not data.get("code"):
             raise LiveApiUnavailable("Exclusive detail is missing")
-        try:
-            bonus = _get_json(f"https://jkt48.com/api/v1/exclusives/{code}/bonus?lang=id", 12)
-            data = _apply_bonus_stock(data, bonus.get("data"))
-        except LiveApiUnavailable:
-            pass  # Bonus may be unavailable after sales close; keep the regular API detail.
-        _write_cache(cache_file, {"last_updated": waktu_sekarang, "data": data})
-        return {
-            "data": data,
-            "is_live": True,
-            "reason": "",
-            "time": waktu_sekarang,
-        }
     except LiveApiUnavailable as error:
+        is_live, reason = False, str(error)
         cache_payload = _read_cache(cache_file) or _read_cache(bundled_cache_file)
         if cache_payload and cache_payload.get("data"):
-            return {
-                "data": cache_payload["data"],
-                "is_live": False,
-                "reason": str(error),
-                "time": cache_payload.get("last_updated", "Unknown"),
-            }
+            data = cache_payload["data"]
+            time_label = cache_payload.get("last_updated", "Unknown")
+        else:
+            data = EMERGENCY_EXCLUSIVE_DETAILS.get(code)
+            time_label = "Bundled emergency fallback" if data else "No Cache Available"
 
-    emergency_data = EMERGENCY_EXCLUSIVE_DETAILS.get(code)
-    if emergency_data:
-        return {
-            "data": emergency_data,
-            "is_live": False,
-            "reason": "Live API unavailable",
-            "time": "Bundled emergency fallback",
-        }
-
-    return {
-        "data": None,
-        "is_live": False,
-        "reason": "Live API unavailable",
-        "time": "No Cache Available",
-    }
+    try:
+        bonus = _get_json(f"https://jkt48.com/api/v1/exclusives/{code}/bonus?lang=id", 12)
+        data = _apply_bonus_stock(data or {"code": code}, bonus.get("data"))
+        is_live, reason, time_label = True, "", waktu_sekarang
+    except LiveApiUnavailable as error:
+        reason = f"{reason}; bonus: {error}" if reason else f"Bonus: {error}"
+    if is_live:
+        _write_cache(cache_file, {"last_updated": time_label, "data": data})
+    return {"data": data, "is_live": is_live, "reason": reason, "time": time_label}
 
 
 def fetch_exclusive_detail(code):

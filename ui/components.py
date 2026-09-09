@@ -285,7 +285,8 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
             member_name = str(m.get('jkt48_member_name') or 'Unknown')
             current_quota = _as_int(m.get('available_quota'))
             tickets_sold = _as_int(m.get('tickets_sold'))
-            has_ticket_counts = 'tickets_sold' in m and 'available_quota' in m
+            has_remaining = m.get('available_quota') is not None
+            has_ticket_counts = m.get('tickets_sold') is not None and has_remaining
             is_available = _is_available(m)
             jalur_label = str(m.get("label", "-"))
             jalur_title = jalur_label
@@ -323,9 +324,9 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
             elif not is_available:
                 cls, btn_text = "sold", "SOLD&nbsp;OUT"
                 sold_percentage = 100
-            elif has_ticket_counts and current_quota < warn_limit:
+            elif has_remaining and current_quota < warn_limit:
                 cls, btn_text = "warn", f"{current_quota}&nbsp;LEFT"
-            elif not has_ticket_counts:
+            elif not has_remaining:
                 cls, btn_text = "avail", "AVAILABLE"
             else:
                 cls, btn_text = "avail", f"{current_quota}&nbsp;LEFT"
@@ -350,6 +351,7 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
             sales_label = (
                 f"Sold:&nbsp;<b>{tickets_sold}</b>"
                 if has_ticket_counts
+                else f"Remaining:&nbsp;<b>{current_quota}</b>" if has_remaining
                 else f"Status:&nbsp;<b>{'AVAILABLE' if is_available else 'SOLD OUT'}</b>"
             )
             combined_ui = f"""
@@ -380,7 +382,8 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
                 )
             else: 
                 purchase_aria = escape(
-                    f"Purchase ticket for {member_name}, {sesi_label}, {current_quota} remaining; opens in a new tab",
+                    f"Purchase ticket for {member_name}, {sesi_label}, "
+                    f"{str(current_quota) + ' remaining' if has_remaining else 'available'}; opens in a new tab",
                     quote=True,
                 )
                 card_html += (

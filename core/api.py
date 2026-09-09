@@ -288,6 +288,8 @@ def _apply_bonus_stock(data, bonus_sessions):
                         member.get("label"), member.get("member_name"))
             if not all(isinstance(value, str) and value for value in identity) or type(quota) is not int or quota < 0:
                 raise LiveApiUnavailable("Invalid bonus stock")
+            if data.get("category") == "DIGITAL_PHOTOBOOK" and quota > 45:
+                raise LiveApiUnavailable("Video Call stock exceeds capacity (45)")
             stock[identity] = quota
 
     sessions = []
@@ -298,6 +300,8 @@ def _apply_bonus_stock(data, bonus_sessions):
                         member.get("label"), member.get("jkt48_member_name"))
             if identity in stock:
                 member = {**member, "available_quota": stock[identity], "quota_available": stock[identity] > 0}
+                if data.get("category") == "DIGITAL_PHOTOBOOK":
+                    member["tickets_sold"] = 45 - stock[identity]
             details.append(member)
         sessions.append({**session, "session_detail": details})
     return {**data, "session": sessions}

@@ -209,37 +209,46 @@ def live_dashboard_fragment(
     _, close_date = get_sales_window(event_data)
     is_event_closed = bool(close_date and now_wib >= close_date)
 
+    event_stats = calculate_event_stats(event_data, member_metadata)
+    summary = event_stats["summary"]
+    sales_data_available = event_stats["sales_data_available"]
+    st.session_state[f"sales_stats_available_{event_code}"] = sales_data_available
+    notices = []
+
     if has_event_detail and not wr_info.get("is_live"):
-        st.warning(
+        notices.append(
             f"Live API unavailable ({wr_info.get('reason', 'Waiting Room / upstream down')}). "
             f"Showing last known good data ({wr_info.get('time')}). "
             f"Retrying every {refresh_interval}s."
         )
     elif not has_event_detail and not wr_info.get("is_live"):
-        st.warning(
+        notices.append(
             f"Event sessions are unavailable ({wr_info.get('reason', 'Waiting Room / upstream down')}). "
             f"No cached session data exists for this event yet. Retrying every {refresh_interval}s."
         )
     elif not has_event_detail:
-        st.warning(
+        notices.append(
             f"Session and ticket details are unavailable. Showing event list information only; "
             f"retrying every {refresh_interval}s."
         )
 
-    if is_admin and is_waiting_room_detected():
-        if st.button("Mitigate Waiting Room", icon=":material/key:", key=f"wr_cookie_{event_code}"):
-            show_jkt48_cookie_dialog()
-
     if wr_info.get("is_live") and wr_info.get("reason"):
-        st.info(f"Sisa stok bonus belum berhasil dimuat ({wr_info['reason']}). Menampilkan data API utama.")
+        notices.append(f"Sisa stok bonus belum berhasil dimuat ({wr_info['reason']}). Menampilkan data API utama.")
+    if has_event_detail and not sales_data_available:
+        notices.append("Jumlah terjual tidak tersedia dari API. Kartu menampilkan sisa stok jika tersedia, atau status ketersediaan.")
+
+    can_mitigate = is_admin and is_waiting_room_detected()
+    if notices or can_mitigate:
+        with st.container(border=True):
+            if notices:
+                show_notice = st.warning if not wr_info.get("is_live") or not has_event_detail else st.info
+                show_notice("\n\n".join(notices))
+            if can_mitigate:
+                if st.button("Mitigate Waiting Room", icon=":material/key:", key=f"wr_cookie_{event_code}"):
+                    show_jkt48_cookie_dialog()
 
     if not has_event_detail:
         return
-
-    event_stats = calculate_event_stats(event_data, member_metadata)
-    summary = event_stats["summary"]
-    sales_data_available = event_stats["sales_data_available"]
-    st.session_state[f"sales_stats_available_{event_code}"] = sales_data_available
 
     if sales_data_available:
         st.markdown(
@@ -271,8 +280,6 @@ def live_dashboard_fragment(
             """,
             unsafe_allow_html=True,
         )
-    else:
-        st.info("Jumlah terjual tidak tersedia dari API. Kartu menampilkan sisa stok jika tersedia, atau status ketersediaan.")
 
     render_event_cards(event_data, search_query, nickname_map, photo_map, available_only, is_event_closed)
     render_stats_payload(

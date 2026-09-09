@@ -85,16 +85,10 @@ def show_jkt48_cookie_dialog():
     if cookie_active:
         st.success("Mitigation cookie aktif untuk retry Waiting Room.")
     else:
-        st.warning("Waiting Room terdeteksi. Masukkan dua value cookie dari browser yang sudah lolos.")
+        st.warning("Waiting Room terdeteksi. Masukkan value cookie Waiting Room dari browser yang sudah lolos.")
 
     st.caption("Salin kolom Value dari browser. Nama cookie akan ditambahkan otomatis.")
     with st.form("jkt48_cookie_form"):
-        clearance = st.text_input(
-            "cf_clearance value",
-            type="password",
-            placeholder="rCdyhpzrkj0S…",
-            help="Boleh berupa value saja atau cf_clearance=value.",
-        )
         waiting_room = st.text_input(
             "Waiting Room value",
             type="password",
@@ -113,7 +107,7 @@ def show_jkt48_cookie_dialog():
 
         if apply_cookie or remove_cookie:
             try:
-                cookie = "" if remove_cookie else build_jkt48_cookie(clearance, waiting_room)
+                cookie = "" if remove_cookie else build_jkt48_cookie(waiting_room)
             except ValueError as error:
                 st.error(str(error))
             else:

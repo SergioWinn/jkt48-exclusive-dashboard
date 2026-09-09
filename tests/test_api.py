@@ -53,10 +53,12 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
         self.assertNotIn("Cookie", get.call_args.kwargs["headers"])
         self.assertFalse(is_waiting_room_detected())
 
-    def test_cookie_values_are_combined_for_the_request_header(self):
-        cookie = build_jkt48_cookie("cf_clearance=clearance", "waiting")
-
-        self.assertEqual(cookie, f"cf_clearance=clearance; {WAITING_ROOM_COOKIE_NAME}=waiting")
+    def test_waiting_room_cookie_value_builds_the_request_header(self):
+        self.assertEqual(build_jkt48_cookie(" waiting== "), f"{WAITING_ROOM_COOKIE_NAME}=waiting==")
+        self.assertEqual(build_jkt48_cookie("__cfwaitingroom_custom=waiting=="), "__cfwaitingroom_custom=waiting==")
+        for value in ("", "__cfwaitingroom_custom", "__cfwaitingroom_custom=", "waiting; other=value", "waiting\r\nOther: value"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                build_jkt48_cookie(value)
 
     @patch("core.api.USING_BROWSER_CLIENT", False)
     @patch("core.api.browser_requests.get")

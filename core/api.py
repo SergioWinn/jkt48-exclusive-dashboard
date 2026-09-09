@@ -24,7 +24,7 @@ FALLBACK_HEADERS = {
 RUNTIME_CACHE_DIR = ".runtime_cache"
 _runtime_jkt48_cookie = None
 _waiting_room_detected = False
-WAITING_ROOM_COOKIE_NAME = "__cfwaitingroom_ZTQYgBEnKachvw02U27HjtX2nXWqUNZSxvbKT2M0P6"
+WAITING_ROOM_COOKIE_NAME = "__cfwaitingroom_q7VnL4xM2pK8dR5sT1wY9cB6hJ3uF0zA7eG2mN5Q8"
 KNOWN_EXCLUSIVE_EVENTS = [
     {"exclusive_id": 936, "category": "PHOTOCARD", "thumbnail_image": "https://jkt48.com/api/v1/storages/media/exclusive/2026/04/ex7b6d-thumb-d71768.jpg", "preview_image": "https://jkt48.com/api/v1/storages/media/exclusive/2026/04/ex7b6d-preview-8a69c1.jpg", "code": "EXE588", "valid_date_from": "2026-04-02T11:00:00.000Z", "sort_order": 1, "title": "Personal Meet and Greet Festival: LOVE DREAM PASSION, Meet & Greet - 23 May", "short_description": ""},
     {"exclusive_id": 962, "category": "DIGITAL_PHOTOBOOK", "thumbnail_image": "https://jkt48.com/api/v1/storages/media/exclusive/2026/07/ex7f6c-thumb-a2122e.jpg", "preview_image": "https://jkt48.com/api/v1/storages/media/exclusive/2026/07/ex7f6c-preview-872f71.jpg", "code": "EX7F6C", "valid_date_from": "2026-07-16T13:00:00.000Z", "sort_order": None, "title": "JKT48 Request Hour 2026 Setlist Best 40", "short_description": ""},
@@ -92,18 +92,17 @@ def is_waiting_room_detected():
     return _waiting_room_detected
 
 
-def build_jkt48_cookie(clearance, waiting_room):
-    clearance = clearance.strip().removeprefix("cf_clearance=")
+def build_jkt48_cookie(waiting_room):
     waiting_room = waiting_room.strip()
     if waiting_room.startswith("__cfwaitingroom"):
         waiting_room_name, separator, waiting_room = waiting_room.partition("=")
     else:
         waiting_room_name, separator = WAITING_ROOM_COOKIE_NAME, "="
-    if not clearance or not waiting_room or not separator:
-        raise ValueError("Kedua value cookie wajib diisi.")
-    if any(character in f"{clearance}{waiting_room_name}{waiting_room}" for character in "\r\n;"):
+    if not waiting_room or not separator:
+        raise ValueError("Value cookie Waiting Room wajib diisi.")
+    if any(character in f"{waiting_room_name}{waiting_room}" for character in "\r\n;"):
         raise ValueError("Tempel value cookie tanpa titik koma atau baris baru.")
-    return f"cf_clearance={clearance}; {waiting_room_name}={waiting_room}"
+    return f"{waiting_room_name}={waiting_room}"
 
 
 def _set_wr_status(code, is_live, time_label, reason=""):

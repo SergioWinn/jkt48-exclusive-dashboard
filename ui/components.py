@@ -316,15 +316,13 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
            # --- LOGIKA TEMA CARD TERPADU (CLOSED / SOLD OUT / LOW / AVAILABLE) ---
             if is_event_closed or not is_before_deadline:
                 cls = "closed"
-                btn_text = "CLOSED"
             elif not is_available:
-                cls, btn_text = "sold", "SOLD&nbsp;OUT"
+                cls = "sold"
             elif has_remaining and current_quota < warn_limit:
-                cls, btn_text = "warn", f"{current_quota}&nbsp;LEFT"
-            elif not has_remaining:
-                cls, btn_text = "avail", "AVAILABLE"
+                cls = "warn"
             else:
-                cls, btn_text = "avail", f"{current_quota}&nbsp;LEFT"
+                cls = "avail"
+            btn_text = f"{current_quota if has_remaining else '&mdash;'}&nbsp;LEFT"
 
             safe_name_img = member_name.strip().lower()
             raw_photo_value = photo_map.get(safe_name_img)

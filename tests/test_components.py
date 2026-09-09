@@ -26,10 +26,12 @@ class EventCardsTest(unittest.TestCase):
                 if quota is None:
                     self.assertIn("Status:&nbsp;<b>AVAILABLE</b>", html)
                     self.assertNotIn("0 remaining", html)
+                    self.assertIn("&mdash;&nbsp;LEFT", html)
                 else:
                     self.assertIn(f"Status:&nbsp;<b>{'AVAILABLE' if quota else 'SOLD OUT'}</b>", html)
                     self.assertNotIn("Remaining:&nbsp;", html)
-                    self.assertIn(f"{quota}&nbsp;LEFT" if quota else "SOLD&nbsp;OUT", html)
+                    self.assertIn(f"{quota}&nbsp;LEFT", html)
+                    self.assertNotIn("SOLD&nbsp;OUT", html)
 
     @patch("ui.components.st.markdown")
     def test_video_call_shows_remaining_without_estimating_sales(self, markdown):
@@ -47,7 +49,7 @@ class EventCardsTest(unittest.TestCase):
                 render_event_cards(data, "", {}, {}, False)
                 html = markdown.call_args.args[0]
                 self.assertIn(f"Status:&nbsp;<b>{'AVAILABLE' if quota else 'SOLD OUT'}</b>", html)
-                self.assertIn(f"{quota}&nbsp;LEFT" if quota else "SOLD&nbsp;OUT", html)
+                self.assertIn(f"{quota}&nbsp;LEFT", html)
                 self.assertNotIn("Remaining:&nbsp;", html)
                 self.assertNotIn("Sold:&nbsp;", html)
                 self.assertNotIn("c-prog-fill", html)
@@ -55,6 +57,10 @@ class EventCardsTest(unittest.TestCase):
                 stats = calculate_event_stats(data)
                 self.assertFalse(stats["sales_data_available"])
                 self.assertEqual(stats["summary"]["remaining"], quota)
+                render_event_cards(data, "", {}, {}, False, is_event_closed=True)
+                closed_html = markdown.call_args.args[0]
+                self.assertIn(f"{quota}&nbsp;LEFT", closed_html)
+                self.assertNotIn("purchase-card", closed_html)
 
 
 if __name__ == "__main__":

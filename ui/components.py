@@ -343,10 +343,7 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
                 initials = ''.join(part[0] for part in member_name.split()[:2]).upper() or '?'
                 img_html = f'<div class="c-photo c-photo-placeholder" aria-hidden="true">{escape(initials)}</div>'
                                         
-            sales_label = (
-                f"Remaining:&nbsp;<b>{current_quota}</b>" if has_remaining
-                else f"Status:&nbsp;<b>{'AVAILABLE' if is_available else 'SOLD OUT'}</b>"
-            )
+            sales_label = f"Status:&nbsp;<b>{'AVAILABLE' if is_available else 'SOLD OUT'}</b>"
             combined_ui = f"""
             <div class="c-stats">
                 <span>{sales_label}</span>

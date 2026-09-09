@@ -27,7 +27,8 @@ class EventCardsTest(unittest.TestCase):
                     self.assertIn("Status:&nbsp;<b>AVAILABLE</b>", html)
                     self.assertNotIn("0 remaining", html)
                 else:
-                    self.assertIn(f"Remaining:&nbsp;<b>{quota}</b>", html)
+                    self.assertIn(f"Status:&nbsp;<b>{'AVAILABLE' if quota else 'SOLD OUT'}</b>", html)
+                    self.assertNotIn("Remaining:&nbsp;", html)
                     self.assertIn(f"{quota}&nbsp;LEFT" if quota else "SOLD&nbsp;OUT", html)
 
     @patch("ui.components.st.markdown")
@@ -45,7 +46,9 @@ class EventCardsTest(unittest.TestCase):
                 data = _apply_bonus_stock(event, bonus)
                 render_event_cards(data, "", {}, {}, False)
                 html = markdown.call_args.args[0]
-                self.assertIn(f"Remaining:&nbsp;<b>{quota}</b>", html)
+                self.assertIn(f"Status:&nbsp;<b>{'AVAILABLE' if quota else 'SOLD OUT'}</b>", html)
+                self.assertIn(f"{quota}&nbsp;LEFT" if quota else "SOLD&nbsp;OUT", html)
+                self.assertNotIn("Remaining:&nbsp;", html)
                 self.assertNotIn("Sold:&nbsp;", html)
                 self.assertNotIn("c-prog-fill", html)
                 self.assertNotIn("tickets_sold", data["session"][0]["session_detail"][0])

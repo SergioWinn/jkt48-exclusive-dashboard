@@ -7,6 +7,7 @@ from html import escape
 from pathlib import Path
 
 from core.api import (
+    LiveApiUnavailable,
     build_jkt48_cookie,
     clear_exclusive_detail_cache,
     fetch_exclusive_detail,
@@ -15,6 +16,7 @@ from core.api import (
     get_member_database,
     is_waiting_room_detected,
     set_jkt48_cookie,
+    validate_jkt48_cookie,
 )
 from core.refresh import get_detail_refresh_interval, get_sales_window
 from core.stats import calculate_event_stats, format_rupiah, load_member_metadata, table_rows
@@ -83,7 +85,7 @@ is_admin = bool(access_key and access_key in admin_keys)
 def show_jkt48_cookie_dialog():
     cookie_active = bool(get_jkt48_cookie())
     if cookie_active:
-        st.success("Mitigation cookie aktif untuk retry Waiting Room.")
+        st.info("Cookie Waiting Room tersimpan untuk retry API.")
     else:
         st.warning("Waiting Room terdeteksi. Masukkan value cookie Waiting Room dari browser yang sudah lolos.")
 
@@ -108,14 +110,24 @@ def show_jkt48_cookie_dialog():
         if apply_cookie or remove_cookie:
             try:
                 cookie = "" if remove_cookie else build_jkt48_cookie(waiting_room)
+                if apply_cookie:
+                    with st.spinner("Memeriksa cookie Waiting Room ke API…"):
+                        validate_jkt48_cookie(cookie)
             except ValueError as error:
                 st.error(str(error))
+            except LiveApiUnavailable as error:
+                st.error(f"Cookie belum diterapkan: akses API belum berhasil ({error}). Periksa cookie atau coba lagi.")
             else:
                 set_jkt48_cookie(cookie)
                 get_member_database.clear()
                 get_active_exclusive_events.clear()
                 clear_exclusive_detail_cache()
-                st.rerun()
+                if remove_cookie:
+                    st.rerun()
+                st.success("API berhasil diakses dengan cookie ini. Cookie Waiting Room sudah diterapkan.")
+
+    if get_jkt48_cookie() and st.button("Refresh dashboard", use_container_width=True):
+        st.rerun()
 
 
 @st.fragment(run_every=5)

@@ -16,6 +16,7 @@ from core.api import (
     get_member_database,
     is_waiting_room_detected,
     set_jkt48_cookie,
+    validate_jkt48_cookie,
     _http_get,
 )
 
@@ -70,13 +71,31 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
         )
         live_api = Mock(status_code=200, headers={"content-type": "application/json"})
         get.side_effect = [challenge, live_api]
-        set_jkt48_cookie("cf_clearance=admin")
+        set_jkt48_cookie(build_jkt48_cookie("admin"))
 
         response = _http_get("https://jkt48.com/api/v1/members", 15)
 
         self.assertIs(response, live_api)
         self.assertNotIn("Cookie", get.call_args_list[0].kwargs["headers"])
-        self.assertEqual(get.call_args_list[1].kwargs["headers"]["Cookie"], "cf_clearance=admin")
+        self.assertEqual(get.call_args_list[1].kwargs["headers"]["Cookie"], f"{WAITING_ROOM_COOKIE_NAME}=admin")
+
+    @patch("core.api._send_http_get")
+    def test_cookie_validation_checks_live_response_without_saving(self, get):
+        cookie = build_jkt48_cookie("candidate")
+        response = Mock(status_code=200, headers={"content-type": "application/json"})
+        response.json.return_value = {"status": True, "data": []}
+        get.return_value = response
+        with patch("core.api.set_jkt48_cookie") as save:
+            validate_jkt48_cookie(cookie)
+            self.assertEqual(get.call_args.args[2]["Cookie"], cookie)
+            response.headers = {"content-type": "text/html"}
+            response.text = "Cloudflare Waiting Room"
+            with self.assertRaisesRegex(LiveApiUnavailable, "Waiting Room"):
+                validate_jkt48_cookie(cookie)
+            get.side_effect = TimeoutError("Timed out")
+            with self.assertRaisesRegex(LiveApiUnavailable, "Connection failed"):
+                validate_jkt48_cookie(cookie)
+            save.assert_not_called()
 
     @patch("core.api._read_cache")
     @patch("core.api._get_json", side_effect=LiveApiUnavailable("Cloudflare challenge"))

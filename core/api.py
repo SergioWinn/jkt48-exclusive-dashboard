@@ -164,9 +164,16 @@ def _http_get(url, timeout):
     return response
 
 
-def _get_json(url, timeout):
+def validate_jkt48_cookie(cookie):
+    _get_json("https://jkt48.com/api/v1/exclusives?lang=id", 12, cookie=cookie)
+
+
+def _get_json(url, timeout, cookie=None):
     try:
-        response = _http_get(url, timeout)
+        response = (
+            _http_get(url, timeout) if cookie is None
+            else _send_http_get(url, timeout, {**FALLBACK_HEADERS, "Cookie": cookie})
+        )
     except Exception as error:
         raise LiveApiUnavailable(f"Connection failed: {error}") from error
 

@@ -322,7 +322,7 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
                 cls = "warn"
             else:
                 cls = "avail"
-            btn_text = f"{current_quota if has_remaining else '&mdash;'}&nbsp;LEFT"
+            btn_text = "CLOSED" if cls == "closed" else f"{current_quota if has_remaining else '&mdash;'}&nbsp;LEFT"
 
             safe_name_img = member_name.strip().lower()
             raw_photo_value = photo_map.get(safe_name_img)

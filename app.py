@@ -60,7 +60,7 @@ st.html(
                     <span class="ldp-brand-star"></span>
                     <span class="ldp-brand-dot"></span>
                 </span>
-                <h1 class="ldp-title">GLOBAL EXCLUSIVE MONITOR</h1>
+                <h1 class="ldp-title">Global Exclusive Monitor</h1>
             </div>
             <p class="ldp-subtitle">Choose an event and date, then scan available member slots.</p>
         </div>

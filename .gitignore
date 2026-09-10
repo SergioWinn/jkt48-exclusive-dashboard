@@ -17,3 +17,6 @@ __pycache__/
 
 # Hallmark
 .hallmark
+
+# Local design-skill working files
+scrollcraft/

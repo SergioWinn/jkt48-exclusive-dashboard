@@ -26,12 +26,47 @@ def install_motion_observer():
             }
 
             parentWindow.__ex48MotionObserver?.disconnect();
+            parentWindow.__ex48ScrollObserver?.disconnect();
             const values = parentWindow.__ex48MotionValues ?? new Map();
             parentWindow.__ex48MotionValues = values;
             let scheduled = false;
 
+            const reducedMotion = parentWindow.matchMedia("(prefers-reduced-motion: reduce)");
+
+            function markScrollScenes() {
+                if (reducedMotion.matches) return;
+                parentDocument.documentElement.classList.add("ex48-scroll-ready");
+                const scenes = [
+                    ...parentDocument.querySelectorAll(".event-index-head, .st-key-event_filters"),
+                    ...parentDocument.querySelectorAll("[data-share-session-heading], [data-share-session-grid]"),
+                ];
+                scenes.forEach((scene, index) => {
+                    scene.classList.add("ex48-reveal");
+                    scene.style.setProperty("--ex48-delay", `${Math.min(index, 3) * 45}ms`);
+                });
+                parentDocument.querySelectorAll(".cards-grid .ldp-card").forEach((card, index) => {
+                    card.classList.add("ex48-reveal");
+                    card.style.setProperty("--ex48-delay", `${Math.min(index % 6, 5) * 35}ms`);
+                });
+            }
+
+            function observeScrollScenes() {
+                markScrollScenes();
+                if (reducedMotion.matches) return;
+                parentWindow.__ex48ScrollObserver?.disconnect();
+                const observer = new parentWindow.IntersectionObserver(entries => {
+                    entries.forEach(entry => {
+                        if (!entry.isIntersecting) return;
+                        entry.target.classList.add("is-inview");
+                        observer.unobserve(entry.target);
+                    });
+                }, { threshold: 0.12, rootMargin: "0px 0px -7% 0px" });
+                parentDocument.querySelectorAll(".ex48-reveal:not(.is-inview)").forEach(scene => observer.observe(scene));
+                parentWindow.__ex48ScrollObserver = observer;
+            }
+
             function play(target) {
-                if (parentWindow.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+                if (reducedMotion.matches) return;
                 target.getAnimations().forEach(animation => animation.cancel());
                 target.animate(
                     [
@@ -66,10 +101,19 @@ def install_motion_observer():
             const observer = new MutationObserver(() => {
                 if (scheduled) return;
                 scheduled = true;
-                parentWindow.requestAnimationFrame(sync);
+                parentWindow.requestAnimationFrame(() => {
+                    sync();
+                    observeScrollScenes();
+                });
             });
             observer.observe(parentDocument.body, { childList: true, characterData: true, subtree: true });
             parentWindow.__ex48MotionObserver = observer;
+            if (parentWindow.__ex48FocusListener) {
+                parentDocument.removeEventListener("focusin", parentWindow.__ex48FocusListener);
+            }
+            parentWindow.__ex48FocusListener = event => event.target.closest(".ex48-reveal")?.classList.add("is-inview");
+            parentDocument.addEventListener("focusin", parentWindow.__ex48FocusListener);
+            observeScrollScenes();
             sync();
         })();
         </script>

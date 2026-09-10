@@ -239,7 +239,7 @@ def live_dashboard_fragment(
 
     can_mitigate = is_admin and is_waiting_room_detected()
     if notices or can_mitigate:
-        with st.container(border=True):
+        with st.container(border=False):
             if notices:
                 show_notice = st.warning if not wr_info.get("is_live") or not has_event_detail else st.info
                 show_notice("\n\n".join(notices))

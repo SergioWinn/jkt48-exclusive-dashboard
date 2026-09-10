@@ -666,16 +666,11 @@ div[class*="st-key-filter_date_"] [role="radiogroup"] label {
 .c-prog-text {
     position: relative;
     z-index: 1;
-    color: var(--color-graphite-ink);
+    color: var(--color-ink);
     font-family: var(--font-body);
     font-size: var(--text-xs);
     font-weight: 600;
     letter-spacing: 0.05em;
-    text-shadow:
-        -1px 0 var(--color-overlay),
-        1px 0 var(--color-overlay),
-        0 -1px var(--color-overlay),
-        0 1px var(--color-overlay);
     white-space: nowrap;
 }
 

@@ -117,7 +117,7 @@ def install_motion_observer():
         })();
         </script>
         """,
-        height=0,
+        height=1,
         tab_index=-1,
     )
 
@@ -454,7 +454,7 @@ def render_stats_payload(rows_by_tab, title, photo_map=None):
         }}
         </script>
         """,
-        height=0,
+        height=1,
         tab_index=-1,
     )
 

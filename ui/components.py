@@ -7,13 +7,12 @@ import re
 from html import escape
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
-import streamlit.components.v1 as components
 
 from core.refresh import get_sales_window
 
 
 def install_motion_observer():
-    components.html(
+    st.iframe(
         """
         <script>
         (() => {
@@ -119,6 +118,7 @@ def install_motion_observer():
         </script>
         """,
         height=0,
+        tab_index=-1,
     )
 
 
@@ -443,7 +443,7 @@ def render_stats_payload(rows_by_tab, title, photo_map=None):
         {"rowsByTab": rows_by_tab, "title": str(title or "Event statistics"), "photoMap": photo_map or {}},
         ensure_ascii=False,
     )
-    components.html(
+    st.iframe(
         f"""
         <script>
         window.parent.__ex48StatsPayload = {payload};
@@ -455,6 +455,7 @@ def render_stats_payload(rows_by_tab, title, photo_map=None):
         </script>
         """,
         height=0,
+        tab_index=-1,
     )
 
 
@@ -1073,7 +1074,7 @@ def render_stats_controls(rows_by_tab=None, title="Event statistics", can_share=
         .replace("__PAYLOAD__", payload)
         .replace("__TITLE__", safe_title)
     )
-    components.html(controls_html, height=70)
+    st.iframe(controls_html, height=70)
 
 
 def render_share_controls(storage_key, right_px=84):
@@ -1649,7 +1650,7 @@ def render_share_controls(storage_key, right_px=84):
     """
     safe_storage_key = re.sub(r'[^a-zA-Z0-9_-]+', '_', storage_key)
     controls_html = controls_html.replace("__STORAGE_KEY__", safe_storage_key).replace("__RIGHT_PX__", str(int(right_px)))
-    components.html(controls_html, height=70)
+    st.iframe(controls_html, height=70)
 
 
 

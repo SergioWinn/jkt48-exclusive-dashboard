@@ -35,8 +35,10 @@ class EventCardsTest(unittest.TestCase):
                 closed_event = {**data, "valid_date_to": "2000-01-01T00:00:00"}
                 render_event_cards(closed_event, "", {}, {}, False)
                 closed_html = markdown.call_args.args[0]
-                self.assertIn('<div class="c-prog-text">CLOSED</div>', closed_html)
-                self.assertNotIn("&nbsp;LEFT", closed_html)
+                if quota is None:
+                    self.assertIn('<div class="c-prog-text">CLOSED</div>', closed_html)
+                else:
+                    self.assertIn(f"{quota}&nbsp;LEFT&nbsp;AT&nbsp;CLOSE", closed_html)
                 self.assertNotIn("purchase-card", closed_html)
 
     @patch("ui.components.st.markdown")
@@ -65,8 +67,7 @@ class EventCardsTest(unittest.TestCase):
                 self.assertEqual(stats["summary"]["remaining"], quota)
                 render_event_cards(data, "", {}, {}, False, is_event_closed=True)
                 closed_html = markdown.call_args.args[0]
-                self.assertIn('<div class="c-prog-text">CLOSED</div>', closed_html)
-                self.assertNotIn("&nbsp;LEFT", closed_html)
+                self.assertIn(f"{quota}&nbsp;LEFT&nbsp;AT&nbsp;CLOSE", closed_html)
                 self.assertNotIn("purchase-card", closed_html)
 
 

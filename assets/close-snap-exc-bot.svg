@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="CloseSnap Exclusive bot">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#111722"/>
+      <stop offset="1" stop-color="#263a70"/>
+    </linearGradient>
+    <mask id="ticket">
+      <rect width="512" height="512" fill="#000"/>
+      <path d="M70 112H442V202A60 60 0 0 0 442 310V400H70V310A60 60 0 0 0 70 202Z" fill="#fff"/>
+      <path d="M256 142 283 225H370L300 276 334 360 256 308 178 360 212 276 142 225H229Z" fill="#000"/>
+    </mask>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect x="28" y="28" width="456" height="456" rx="92" fill="none" stroke="#ffffff" stroke-opacity=".12" stroke-width="4"/>
+  <g mask="url(#ticket)">
+    <rect x="70" y="112" width="186" height="288" fill="#f2f4f8"/>
+    <rect x="256" y="112" width="186" height="288" fill="#6487e8"/>
+  </g>
+  <circle cx="394" cy="160" r="23" fill="#d02b3c" stroke="#fff" stroke-width="7"/>
+</svg>

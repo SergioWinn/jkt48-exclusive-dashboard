@@ -3,6 +3,7 @@
 .venv
 env/
 venv/
+node_modules/
 
 # Python
 __pycache__/

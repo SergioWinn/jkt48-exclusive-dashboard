@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "jkt48-exclusive-close-snapshot",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-13",
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "SNAPSHOTS",
+      "id": "495422c2cf734853b22d4218f781d249"
+    }
+  ]
+}

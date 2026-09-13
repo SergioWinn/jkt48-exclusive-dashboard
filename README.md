@@ -42,6 +42,7 @@ This project is built as an operational tracker: it polls public event data, fal
 |   `-- tokens.css            # Design tokens
 |-- assets/                   # SVG assets
 |-- tests/                    # Unit tests
+|-- worker/                   # Optional Cloudflare Cron → Telegram close snapshot
 `-- requirements.txt
 ```
 
@@ -109,6 +110,7 @@ python -m compileall app.py core ui tests
 - Ensure `data/member_metadata.csv` is updated when member generation or team data changes.
 - The app can continue showing cached or fallback data when the live upstream API is blocked or unavailable.
 - Admin share/capture features depend on browser clipboard support.
+- Optional `worker/` can store and send a Telegram JSON snapshot exactly one minute before sales close, without an open Streamlit session. See [worker/README.md](worker/README.md).
 
 ## Disclaimer
 

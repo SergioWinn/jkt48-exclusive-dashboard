@@ -177,25 +177,20 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
                          {"status": True, "data": []}, {"status": True, "data": None},
                          {"status": True, "data": [bonus, {"session_members": [None]}]}):
             with self.subTest(response=response):
-                get_json.reset_mock()
                 clear_exclusive_detail_cache()
-                get_json.side_effect = [response, {"status": True, "data": original}]
+                get_json.side_effect = [{"status": True, "data": original}, response]
                 detail = fetch_exclusive_detail("EX5A08")
-                self.assertEqual(
-                    get_json.call_args_list[0].args[0],
-                    "https://jkt48.com/api/v1/exclusives/EX5A08/bonus?lang=id",
-                )
+                self.assertEqual(get_json.call_args.args[0], "https://jkt48.com/api/v1/exclusives/EX5A08/bonus?lang=id")
                 if isinstance(response, dict) and response.get("data") == [bonus]:
                     updated = detail["session"][0]["session_detail"][0]
                     self.assertEqual(updated["available_quota"], 0)
                     self.assertFalse(updated["quota_available"])
-                    self.assertNotIn("tickets_sold", updated)
-                    self.assertEqual(len(detail["session"]), 1)
+                    self.assertEqual(updated["tickets_sold"], 10)
+                    self.assertEqual(detail["session"][1], original["session"][1])
+                    self.assertEqual(detail["default_price"], 120000)
                     self.assertEqual(member["available_quota"], 35)
-                    self.assertEqual(get_json.call_count, 1)
                 else:
                     self.assertEqual(detail, original)
-                    self.assertEqual(get_json.call_count, 2)
                 self.assertEqual(write_cache.call_args.args[1]["data"], detail)
 
     @patch("core.api._set_wr_status")
@@ -216,9 +211,9 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
         for response in (bonus, LiveApiUnavailable("HTTP 429")):
             with self.subTest(response=response):
                 clear_exclusive_detail_cache()
-                get_json.side_effect = [response, LiveApiUnavailable("HTTP 429")]
+                get_json.side_effect = [LiveApiUnavailable("HTTP 429"), response]
                 data = fetch_exclusive_detail("EX5A08")
-                self.assertIn("/bonus?lang=id", get_json.call_args_list[0].args[0])
+                self.assertIn("/bonus?lang=id", get_json.call_args.args[0])
                 if response is bonus:
                     self.assertTrue(status.call_args.args[1])
                     member = data["session"][0]["session_detail"][0]
@@ -236,12 +231,12 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
     @patch("core.api._read_cache", return_value=None)
     @patch("core.api._get_json")
     def test_new_event_stock_works_without_detail_or_cache(self, get_json, read_cache, write_cache, status):
-        get_json.return_value = {"status": True, "data": [{
+        get_json.side_effect = [LiveApiUnavailable("HTTP 429"), {"status": True, "data": [{
             "exclusive_session_code": "EX5A08-SNCCF4", "date": "2026-09-13",
             "start_time": "11:45:00", "end_time": "12:45:00", "label": "Sesi 1",
             "session_members": [{"label": "Jalur 1", "member_name": "Jacqueline Immanuela",
                                  "session_detail_code": "EX5A08-SNCCF4-SD3017", "available_quota": 6}],
-        }]}
+        }]}]
         data = fetch_exclusive_detail("EX5A08")
         self.assertEqual(data["code"], "EX5A08")
         member = data["session"][0]["session_detail"][0]

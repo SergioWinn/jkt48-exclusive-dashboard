@@ -18,7 +18,7 @@ from core.api import (
     set_jkt48_cookie,
     validate_jkt48_cookie,
 )
-from core.refresh import get_detail_refresh_interval, get_sales_window
+from core.refresh import get_detail_refresh_interval, is_event_closed
 from core.stats import calculate_event_stats, format_rupiah, load_member_metadata, table_rows
 from ui.styles import GLOBAL_CSS
 from ui.components import render_event_cards, render_share_controls, render_stats_controls, render_stats_payload
@@ -130,8 +130,7 @@ def show_jkt48_cookie_dialog():
         st.rerun()
 
 
-@st.fragment(run_every=5)
-def live_dashboard_fragment(
+def _render_dashboard(
     selected_event,
     search_query,
     nickname_map,
@@ -140,24 +139,25 @@ def live_dashboard_fragment(
     available_only,
     current_event_codes,
 ):
-    refreshed_events = get_active_exclusive_events()
-    refreshed_codes = {event.get("code") for event in refreshed_events if event.get("code")}
-    if refreshed_codes.difference(current_event_codes):
-        st.rerun()
-
     event_code = selected_event.get("code")
     event_state_key = f"event_data_{event_code}"
     attempt_state_key = f"event_fetch_attempt_{event_code}"
     event_data = st.session_state.get(event_state_key) or selected_event
     wr_info = st.session_state.get(f"wr_status_{event_code}", {"is_live": True, "time": ""})
     now_wib = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
+    closed = is_event_closed(event_data, now_wib)
+    if not closed:
+        refreshed_events = get_active_exclusive_events()
+        refreshed_codes = {event.get("code") for event in refreshed_events if event.get("code")}
+        if refreshed_codes.difference(current_event_codes):
+            st.rerun()
     refresh_interval = get_detail_refresh_interval(event_data, wr_info.get("is_live", True), now_wib)
     last_attempt = st.session_state.get(attempt_state_key, 0.0)
 
-    if event_code and (
-        event_state_key not in st.session_state
-        or time.monotonic() - last_attempt >= refresh_interval
-    ):
+    should_fetch = event_state_key not in st.session_state or (
+        not closed and time.monotonic() - last_attempt >= refresh_interval
+    )
+    if event_code and should_fetch:
         st.session_state[attempt_state_key] = time.monotonic()
         fetched_event_data = fetch_exclusive_detail(event_code)
         if fetched_event_data:
@@ -167,10 +167,16 @@ def live_dashboard_fragment(
 
     wr_info = st.session_state.get(f"wr_status_{event_code}", {"is_live": True, "time": ""})
     now_wib = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
+    closed = is_event_closed(event_data, now_wib)
     refresh_interval = get_detail_refresh_interval(event_data, wr_info.get("is_live", True), now_wib)
     has_event_detail = isinstance(event_data.get("session"), list)
 
-    if not has_event_detail:
+    if closed:
+        source_class = "is-cached"
+        source_label = "FINAL SNAPSHOT"
+        source_detail = "Auto refresh stopped"
+        sync_label = wr_info.get("time") or "Last available snapshot"
+    elif not has_event_detail:
         source_class = "is-unavailable"
         source_label = "LIST ONLY"
         source_detail = "Session details unavailable"
@@ -206,8 +212,7 @@ def live_dashboard_fragment(
         unsafe_allow_html=True,
     )
 
-    _, close_date = get_sales_window(event_data)
-    is_event_closed = bool(close_date and now_wib >= close_date)
+    event_closed = closed
 
     event_stats = calculate_event_stats(event_data, member_metadata)
     summary = event_stats["summary"]
@@ -215,18 +220,18 @@ def live_dashboard_fragment(
     st.session_state[f"sales_stats_available_{event_code}"] = sales_data_available
     notices = []
 
-    if has_event_detail and not wr_info.get("is_live"):
+    if has_event_detail and not wr_info.get("is_live") and not event_closed:
         notices.append(
             f"Live API unavailable ({wr_info.get('reason', 'Waiting Room / upstream down')}). "
             f"Showing last known good data ({wr_info.get('time')}). "
             f"Retrying every {refresh_interval}s."
         )
-    elif not has_event_detail and not wr_info.get("is_live"):
+    elif not has_event_detail and not wr_info.get("is_live") and not event_closed:
         notices.append(
             f"Event sessions are unavailable ({wr_info.get('reason', 'Waiting Room / upstream down')}). "
             f"No cached session data exists for this event yet. Retrying every {refresh_interval}s."
         )
-    elif not has_event_detail:
+    elif not has_event_detail and not event_closed:
         notices.append(
             f"Session and ticket details are unavailable. Showing event list information only; "
             f"retrying every {refresh_interval}s."
@@ -281,7 +286,7 @@ def live_dashboard_fragment(
             unsafe_allow_html=True,
         )
 
-    render_event_cards(event_data, search_query, nickname_map, photo_map, available_only, is_event_closed)
+    render_event_cards(event_data, search_query, nickname_map, photo_map, available_only, event_closed)
     render_stats_payload(
         {
             "Member": table_rows(event_stats["members"]),
@@ -291,6 +296,16 @@ def live_dashboard_fragment(
         f"{event_data.get('title', 'Event')} statistics",
         photo_map,
     )
+
+
+@st.fragment(run_every=5)
+def live_dashboard_fragment(*args):
+    _render_dashboard(*args)
+
+
+@st.fragment
+def closed_dashboard_fragment(*args):
+    _render_dashboard(*args)
 
 
 nickname_map, photo_map = get_member_database()
@@ -361,7 +376,11 @@ if available_categories:
         with col_toggle:
             available_only = st.toggle("Available only", value=False)
 
-    live_dashboard_fragment(
+    fragment = closed_dashboard_fragment if is_event_closed(
+        selected_event,
+        datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=7),
+    ) else live_dashboard_fragment
+    fragment(
         selected_event,
         global_query,
         nickname_map,

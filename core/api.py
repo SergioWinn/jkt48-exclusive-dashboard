@@ -318,33 +318,30 @@ def _apply_bonus_stock(data, bonus_sessions):
 
 @st.cache_data(ttl=4, show_spinner=False)
 def _fetch_exclusive_detail_shared(code):
-    url = f"https://jkt48.com/api/v1/exclusives/{code}?lang=id"
     cache_file = os.path.join(RUNTIME_CACHE_DIR, f"exclusive_{code}.json")
     bundled_cache_file = os.path.join("data", "fallback", f"{code}.json")
     now_wib = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
     waktu_sekarang = now_wib.strftime('%d/%m/%Y %H:%M:%S WIB')
     is_live, reason, time_label = True, "", waktu_sekarang
     try:
-        res_json = _get_json(url, 12)
-        data = res_json.get("data")
-        if not isinstance(data, dict) or not data.get("code"):
-            raise LiveApiUnavailable("Exclusive detail is missing")
-    except LiveApiUnavailable as error:
-        is_live, reason = False, str(error)
-        cache_payload = _read_cache(cache_file) or _read_cache(bundled_cache_file)
-        if cache_payload and cache_payload.get("data"):
-            data = cache_payload["data"]
-            time_label = cache_payload.get("last_updated", "Unknown")
-        else:
-            data = EMERGENCY_EXCLUSIVE_DETAILS.get(code)
-            time_label = "Bundled emergency fallback" if data else "No Cache Available"
-
-    try:
         bonus = _get_json(f"https://jkt48.com/api/v1/exclusives/{code}/bonus?lang=id", 12)
-        data = _apply_bonus_stock(data or {"code": code}, bonus.get("data"))
-        is_live, reason, time_label = True, "", waktu_sekarang
-    except LiveApiUnavailable as error:
-        reason = f"{reason}; bonus: {error}" if reason else f"Bonus: {error}"
+        data = _apply_bonus_stock({"code": code}, bonus.get("data"))
+    except LiveApiUnavailable as bonus_error:
+        reason = f"Bonus: {bonus_error}"
+        try:
+            detail = _get_json(f"https://jkt48.com/api/v1/exclusives/{code}?lang=id", 12).get("data")
+            if not isinstance(detail, dict) or not detail.get("code"):
+                raise LiveApiUnavailable("Exclusive detail is missing")
+            data = detail
+        except LiveApiUnavailable as detail_error:
+            is_live, reason = False, f"{reason}; detail: {detail_error}"
+            cache_payload = _read_cache(cache_file) or _read_cache(bundled_cache_file)
+            if cache_payload and cache_payload.get("data"):
+                data = cache_payload["data"]
+                time_label = cache_payload.get("last_updated", "Unknown")
+            else:
+                data = EMERGENCY_EXCLUSIVE_DETAILS.get(code)
+                time_label = "Bundled emergency fallback" if data else "No Cache Available"
     if is_live:
         _write_cache(cache_file, {"last_updated": time_label, "data": data})
     return {"data": data, "is_live": is_live, "reason": reason, "time": time_label}

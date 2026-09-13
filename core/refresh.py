@@ -33,6 +33,11 @@ def get_sales_window(event):
     return None, _parse_datetime(event.get("valid_date_to"))
 
 
+def is_event_closed(event, now_wib):
+    _, end_date = get_sales_window(event)
+    return bool(end_date and now_wib >= end_date)
+
+
 def get_detail_refresh_interval(event, is_live, now_wib):
     if not is_live:
         return RECOVERY_REFRESH_SECONDS

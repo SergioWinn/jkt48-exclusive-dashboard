@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime
 
-from core.refresh import get_detail_refresh_interval
+from core.refresh import get_detail_refresh_interval, is_event_closed
 
 
 class DetailRefreshIntervalTest(unittest.TestCase):
@@ -42,6 +42,7 @@ class DetailRefreshIntervalTest(unittest.TestCase):
         )
 
         self.assertEqual(interval, 60)
+        self.assertTrue(is_event_closed(self.event, datetime(2026, 8, 1, 21, 0, 0)))
 
     def test_waiting_room_recovery_refresh_every_fifteen_seconds(self):
         interval = get_detail_refresh_interval(

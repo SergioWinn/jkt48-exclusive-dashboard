@@ -152,7 +152,11 @@ def _is_cloudflare_gate_response(response):
     if "json" in content_type:
         return False
     body_start = response.text[:1000].lower()
-    return response.status_code == 403 or "just a moment" in body_start or "cf-chl" in body_start
+    return (
+        response.headers.get("cf-mitigated", "").lower() == "challenge"
+        or "just a moment" in body_start
+        or "cf-chl" in body_start
+    )
 
 
 def _http_get(url, timeout):
@@ -179,7 +183,7 @@ def _get_json(url, timeout, cookie=None):
 
     content_type = response.headers.get("content-type", "").lower()
     if response.status_code != 200:
-        reason = "Cloudflare challenge" if response.status_code == 403 else f"HTTP {response.status_code}"
+        reason = "Cloudflare challenge" if _is_cloudflare_gate_response(response) else f"HTTP {response.status_code}"
         raise LiveApiUnavailable(reason)
     if "json" not in content_type:
         body_start = response.text[:1000].lower()
@@ -316,7 +320,7 @@ def _apply_bonus_stock(data, bonus_sessions):
     return {**data, "session": list(sessions.values())}
 
 
-@st.cache_data(ttl=4, show_spinner=False)
+@st.cache_data(ttl=9, show_spinner=False)
 def _fetch_exclusive_detail_shared(code):
     url = f"https://jkt48.com/api/v1/exclusives/{code}?lang=id"
     cache_file = os.path.join(RUNTIME_CACHE_DIR, f"exclusive_{code}.json")

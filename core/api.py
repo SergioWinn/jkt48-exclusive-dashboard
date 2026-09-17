@@ -328,6 +328,7 @@ def _fetch_exclusive_detail_shared(code):
     now_wib = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
     waktu_sekarang = now_wib.strftime('%d/%m/%Y %H:%M:%S WIB')
     is_live, reason, time_label = True, "", waktu_sekarang
+    cache_payload = None
     try:
         data = _get_json(url, 12).get("data")
         if not isinstance(data, dict) or not data.get("code"):
@@ -348,6 +349,12 @@ def _fetch_exclusive_detail_shared(code):
         is_live, reason, time_label = True, "", waktu_sekarang
     except LiveApiUnavailable as error:
         reason = f"{reason}; bonus: {error}" if reason else f"Bonus: {error}"
+        if is_live:
+            cache_payload = _read_cache(cache_file)
+            if cache_payload and cache_payload.get("data"):
+                data = cache_payload["data"]
+                time_label = cache_payload.get("last_updated", "Unknown")
+                is_live = False
     if is_live:
         _write_cache(cache_file, {"last_updated": time_label, "data": data})
     return {"data": data, "is_live": is_live, "reason": reason, "time": time_label}

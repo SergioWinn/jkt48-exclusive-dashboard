@@ -172,8 +172,9 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
         self.assertEqual(set_status.call_count, 20)
 
     @patch("core.api._write_cache")
+    @patch("core.api._read_cache", return_value=None)
     @patch("core.api._get_json")
-    def test_bonus_stock_overrides_matching_slots_and_falls_back(self, get_json, write_cache):
+    def test_bonus_stock_overrides_matching_slots_and_falls_back(self, get_json, _read_cache, write_cache):
         member = {"label": "Jalur 1", "jkt48_member_name": "Jacqueline Immanuela",
                   "tickets_sold": 10, "available_quota": 35, "quota_available": True}
         session = {"date": "2026-09-13", "start_time": "11:45:00", "label": "Sesi 1",
@@ -204,6 +205,24 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
                 else:
                     self.assertEqual(detail, original)
                 self.assertEqual(write_cache.call_args.args[1]["data"], detail)
+
+    @patch("core.api._set_wr_status")
+    @patch("core.api._write_cache")
+    @patch("core.api._read_cache")
+    @patch("core.api._get_json")
+    def test_bonus_failure_keeps_last_complete_snapshot(self, get_json, read_cache, write_cache, status):
+        fresh_main = {"code": "EX5A08", "session": []}
+        cached = {"code": "EX5A08", "session": [{"session_detail": [{"available_quota": 7}]}]}
+        get_json.side_effect = [
+            {"status": True, "data": fresh_main},
+            LiveApiUnavailable("Cloudflare challenge"),
+        ]
+        read_cache.return_value = {"last_updated": "last good", "data": cached}
+
+        self.assertEqual(fetch_exclusive_detail("EX5A08"), cached)
+        self.assertFalse(status.call_args.args[1])
+        self.assertEqual(status.call_args.args[2], "last good")
+        write_cache.assert_not_called()
 
     @patch("core.api._set_wr_status")
     @patch("core.api._write_cache")

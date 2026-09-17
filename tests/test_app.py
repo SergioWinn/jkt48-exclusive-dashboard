@@ -6,7 +6,7 @@ from streamlit.testing.v1 import AppTest
 
 
 class DashboardNoticesTest(unittest.TestCase):
-    def test_closed_event_retries_after_first_snapshot(self):
+    def test_closed_event_uses_static_fragment_after_first_snapshot(self):
         event = {
             "code": "EXCLOSED",
             "title": "Closed event",
@@ -23,11 +23,7 @@ class DashboardNoticesTest(unittest.TestCase):
             app.run(timeout=15)
             self.assertEqual(len(app.exception), 0)
             self.assertEqual(fetch.call_count, 1)
-            self.assertTrue(any("SALES CLOSED" in markdown.value for markdown in app.markdown))
-            app.session_state["event_fetch_attempt_EXCLOSED"] = 0.0
-            app.run(timeout=15)
-            self.assertEqual(len(app.exception), 0)
-            self.assertEqual(fetch.call_count, 2)
+            self.assertTrue(any("FINAL SNAPSHOT" in markdown.value for markdown in app.markdown))
 
     def test_cached_data_uses_status_readout_instead_of_api_warning(self):
         event = {"code": "EXTEST", "title": "Test event", "category": "DIGITAL_PHOTOBOOK",

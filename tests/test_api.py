@@ -241,15 +241,8 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
         self.assertEqual(result["title"], "Fresh")
         self.assertEqual(result["session"][0]["session_detail"][0]["tickets_sold"], 12)
         self.assertEqual(result["session"][0]["session_detail"][0]["available_quota"], 7)
-        self.assertFalse(status.call_args.args[1])
-        self.assertEqual(status.call_args.args[2], "last good")
-        write_cache.assert_not_called()
-
-        clear_exclusive_detail_cache()
-        fresh_main["session"][0]["session_detail"][0]["available_quota"] = 3
-        get_json.side_effect = [{"status": True, "data": fresh_main}, LiveApiUnavailable("HTTP 429")]
-        result = fetch_exclusive_detail("EX5A08")
-        self.assertEqual(result["session"][0]["session_detail"][0]["available_quota"], 3)
+        self.assertTrue(status.call_args.args[1])
+        self.assertEqual(write_cache.call_args.args[1]["data"], result)
 
     @patch("core.api._set_wr_status")
     @patch("core.api._write_cache")

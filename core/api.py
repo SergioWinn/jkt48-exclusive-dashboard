@@ -1,6 +1,7 @@
 # core/api.py
 
 import json
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 
@@ -316,7 +317,7 @@ def _apply_cached_bonus_stock(data, cached_data):
     for session in data.get("session", []):
         for member in session.get("session_detail", []):
             key = _bonus_stock_key(session, member.get("label"), member.get("jkt48_member_name"))
-            if key in cached_stock:
+            if key in cached_stock and type(member.get("available_quota")) is not int:
                 member["available_quota"] = cached_stock[key]
                 member["quota_available"] = cached_stock[key] > 0
     return data
@@ -337,6 +338,7 @@ def _fetch_exclusive_detail_shared(code):
             raise LiveApiUnavailable("Exclusive detail is missing")
     except LiveApiUnavailable as error:
         is_live, reason = False, str(error)
+        logging.getLogger(__name__).warning("Detail sync failed for %s: %s", code, error)
         cache_payload = _read_cache(cache_file) or _read_cache(bundled_cache_file)
         if cache_payload and cache_payload.get("data"):
             data = cache_payload["data"]
@@ -351,10 +353,13 @@ def _fetch_exclusive_detail_shared(code):
         is_live, reason, time_label = True, "", waktu_sekarang
     except LiveApiUnavailable as error:
         reason = f"{reason}; bonus: {error}" if reason else f"Bonus: {error}"
+        logging.getLogger(__name__).warning("Bonus sync failed for %s: %s", code, error)
         if is_live:
             cache_payload = _read_cache(cache_file)
             if cache_payload and cache_payload.get("data"):
                 data = _apply_cached_bonus_stock(data, cache_payload["data"])
+                is_live = False
+                time_label = cache_payload.get("last_updated", "Unknown")
     if is_live:
         _write_cache(cache_file, {"last_updated": time_label, "data": data})
     return {"data": data, "is_live": is_live, "reason": reason, "time": time_label}

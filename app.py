@@ -155,7 +155,7 @@ def _render_dashboard(
     last_attempt = st.session_state.get(attempt_state_key, 0.0)
 
     should_fetch = event_state_key not in st.session_state or (
-        not closed and time.monotonic() - last_attempt >= refresh_interval
+        time.monotonic() - last_attempt >= refresh_interval
     )
     if event_code and should_fetch:
         st.session_state[attempt_state_key] = time.monotonic()
@@ -173,8 +173,8 @@ def _render_dashboard(
 
     if closed:
         source_class = "is-cached"
-        source_label = "FINAL SNAPSHOT"
-        source_detail = "Auto refresh stopped"
+        source_label = "SALES CLOSED"
+        source_detail = "Checking for updates"
         sync_label = wr_info.get("time") or "Last available snapshot"
     elif not has_event_detail:
         source_class = "is-unavailable"
@@ -182,9 +182,9 @@ def _render_dashboard(
         source_detail = "Session details unavailable"
         sync_label = f"Retrying every {refresh_interval}s"
     else:
-        source_class = "is-live"
+        source_class = "is-live" if wr_info.get("is_live") else "is-cached"
         source_label = "AUTO SYNC"
-        source_detail = "Updates automatically"
+        source_detail = "Updates automatically" if wr_info.get("is_live") else "Update delayed; retrying automatically"
         sync_label = wr_info.get("time") or "Waiting for first sync"
     event_title = escape(str(event_data.get("title", "Event")))
     raw_category = str(event_data.get("category", "-"))
@@ -290,7 +290,7 @@ def live_dashboard_fragment(*args):
     _render_dashboard(*args)
 
 
-@st.fragment
+@st.fragment(run_every=10)
 def closed_dashboard_fragment(*args):
     _render_dashboard(*args)
 

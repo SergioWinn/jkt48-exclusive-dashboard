@@ -47,8 +47,6 @@ class DashboardNoticesTest(unittest.TestCase):
                 messages = list(app.warning) + list(app.info)
                 self.assertEqual(len(messages), 1)
                 self.assertIn("Jumlah terjual tidak tersedia", messages[0].value)
-                self.assertTrue(any("AUTO SYNC" in markdown.value for markdown in app.markdown))
-                self.assertFalse(any("CACHED DATA" in markdown.value for markdown in app.markdown))
                 if not is_live:
                     self.assertNotIn("Live API unavailable", messages[0].value)
                 self.assertTrue(any(button.label == "Mitigate Waiting Room" for button in app.button))

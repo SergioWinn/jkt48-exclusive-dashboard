@@ -181,11 +181,16 @@ def _render_dashboard(
         source_label = "LIST ONLY"
         source_detail = "Session details unavailable"
         sync_label = f"Retrying every {refresh_interval}s"
-    else:
+    elif wr_info.get("is_live"):
         source_class = "is-live"
-        source_label = "AUTO SYNC"
-        source_detail = "Updates automatically"
+        source_label = "LIVE DATA"
+        source_detail = f"{refresh_interval}s poll interval"
         sync_label = wr_info.get("time") or "Waiting for first sync"
+    else:
+        source_class = "is-cached"
+        source_label = "CACHED DATA"
+        source_detail = f"Retrying every {refresh_interval}s"
+        sync_label = wr_info.get("time") or "Unknown snapshot time"
     event_title = escape(str(event_data.get("title", "Event")))
     raw_category = str(event_data.get("category", "-"))
     event_category = escape(CATEGORY_LABELS.get(raw_category, raw_category.replace("_", " ")))
@@ -285,7 +290,7 @@ def _render_dashboard(
     )
 
 
-@st.fragment(run_every=10)
+@st.fragment(run_every=5)
 def live_dashboard_fragment(*args):
     _render_dashboard(*args)
 

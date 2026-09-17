@@ -119,7 +119,21 @@ def _set_wr_status(code, is_live, time_label, reason=""):
 def _send_http_get(url, timeout, headers):
     kwargs = {"timeout": timeout, "headers": headers}
     if USING_BROWSER_CLIENT:
-        return browser_requests.get(url, impersonate="chrome136", **kwargs)
+        responses = []
+        last_error = None
+        for browser in ("chrome136", "safari184"):
+            try:
+                response = browser_requests.get(url, impersonate=browser, **kwargs)
+            except Exception as error:
+                last_error = error
+                continue
+            responses.append(response)
+            content_type = response.headers.get("content-type", "").lower()
+            if response.status_code == 200 and "json" in content_type:
+                return response
+        if responses:
+            return responses[-1]
+        raise last_error or RuntimeError("No HTTP response")
     return browser_requests.get(url, **kwargs)
 
 
@@ -306,22 +320,6 @@ def _apply_bonus_stock(data, bonus_sessions):
     return {**data, "session": list(sessions.values())}
 
 
-def _apply_cached_bonus_stock(data, cached_data):
-    cached_stock = {
-        _bonus_stock_key(session, member.get("label"), member.get("jkt48_member_name")): member["available_quota"]
-        for session in cached_data.get("session", [])
-        for member in session.get("session_detail", [])
-        if type(member.get("available_quota")) is int and member["available_quota"] >= 0
-    }
-    for session in data.get("session", []):
-        for member in session.get("session_detail", []):
-            key = _bonus_stock_key(session, member.get("label"), member.get("jkt48_member_name"))
-            if key in cached_stock:
-                member["available_quota"] = cached_stock[key]
-                member["quota_available"] = cached_stock[key] > 0
-    return data
-
-
 @st.cache_data(ttl=9, show_spinner=False)
 def _fetch_exclusive_detail_shared(code):
     url = f"https://jkt48.com/api/v1/exclusives/{code}?lang=id"
@@ -354,7 +352,9 @@ def _fetch_exclusive_detail_shared(code):
         if is_live:
             cache_payload = _read_cache(cache_file)
             if cache_payload and cache_payload.get("data"):
-                data = _apply_cached_bonus_stock(data, cache_payload["data"])
+                data = cache_payload["data"]
+                time_label = cache_payload.get("last_updated", "Unknown")
+                is_live = False
     if is_live:
         _write_cache(cache_file, {"last_updated": time_label, "data": data})
     return {"data": data, "is_live": is_live, "reason": reason, "time": time_label}

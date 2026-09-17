@@ -231,6 +231,8 @@ def _render_dashboard(
             f"retrying every {refresh_interval}s."
         )
 
+    if wr_info.get("is_live") and wr_info.get("reason"):
+        notices.append(f"Sisa stok bonus belum berhasil dimuat ({wr_info['reason']}). Menampilkan data API utama.")
     if has_event_detail and not sales_data_available:
         notices.append("Jumlah terjual tidak tersedia dari API. Kartu menampilkan sisa stok jika tersedia, atau status ketersediaan.")
 

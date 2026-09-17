@@ -55,6 +55,16 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
         self.assertNotIn("Cookie", get.call_args.kwargs["headers"])
         self.assertFalse(is_waiting_room_detected())
 
+    @patch("core.api.USING_BROWSER_CLIENT", True)
+    @patch("core.api.browser_requests.get")
+    def test_browser_client_uses_one_consistent_fingerprint(self, get):
+        get.return_value = Mock(status_code=403, headers={"content-type": "text/html"}, text="Forbidden")
+
+        _http_get("https://jkt48.com/api/v1/members", 15)
+
+        get.assert_called_once()
+        self.assertEqual(get.call_args.kwargs["impersonate"], "chrome136")
+
     def test_waiting_room_cookie_value_builds_the_request_header(self):
         self.assertEqual(build_jkt48_cookie(" waiting== "), f"{WAITING_ROOM_COOKIE_NAME}=waiting==")
         self.assertEqual(build_jkt48_cookie("__cfwaitingroom_custom=waiting=="), "__cfwaitingroom_custom=waiting==")
@@ -210,19 +220,29 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
     @patch("core.api._write_cache")
     @patch("core.api._read_cache")
     @patch("core.api._get_json")
-    def test_bonus_failure_keeps_last_complete_snapshot(self, get_json, read_cache, write_cache, status):
-        fresh_main = {"code": "EX5A08", "session": []}
-        cached = {"code": "EX5A08", "session": [{"session_detail": [{"available_quota": 7}]}]}
+    def test_bonus_failure_keeps_live_detail_and_last_known_stock(self, get_json, read_cache, write_cache, status):
+        session = {"date": "2026-09-13", "start_time": "11:45:00", "session_detail": [{
+            "label": "Jalur 1", "jkt48_member_name": "Jacqueline Immanuela", "tickets_sold": 12,
+        }]}
+        fresh_main = {"code": "EX5A08", "title": "Fresh", "session": [session]}
+        cached = {"code": "EX5A08", "title": "Old", "session": [{
+            **session, "session_detail": [{
+                "label": "Jalur 1", "jkt48_member_name": "Jacqueline Immanuela", "available_quota": 7,
+            }],
+        }]}
         get_json.side_effect = [
             {"status": True, "data": fresh_main},
             LiveApiUnavailable("Cloudflare challenge"),
         ]
         read_cache.return_value = {"last_updated": "last good", "data": cached}
 
-        self.assertEqual(fetch_exclusive_detail("EX5A08"), cached)
-        self.assertFalse(status.call_args.args[1])
-        self.assertEqual(status.call_args.args[2], "last good")
-        write_cache.assert_not_called()
+        result = fetch_exclusive_detail("EX5A08")
+
+        self.assertEqual(result["title"], "Fresh")
+        self.assertEqual(result["session"][0]["session_detail"][0]["tickets_sold"], 12)
+        self.assertEqual(result["session"][0]["session_detail"][0]["available_quota"], 7)
+        self.assertTrue(status.call_args.args[1])
+        self.assertEqual(write_cache.call_args.args[1]["data"], result)
 
     @patch("core.api._set_wr_status")
     @patch("core.api._write_cache")

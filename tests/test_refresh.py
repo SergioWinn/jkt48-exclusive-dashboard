@@ -16,23 +16,23 @@ class DetailRefreshIntervalTest(unittest.TestCase):
             ]
         }
 
-    def test_active_sales_refresh_every_ten_seconds(self):
+    def test_active_sales_refresh_every_five_seconds(self):
         interval = get_detail_refresh_interval(
             self.event,
             True,
             datetime(2026, 8, 1, 12, 0, 0),
         )
 
-        self.assertEqual(interval, 10)
+        self.assertEqual(interval, 5)
 
-    def test_ofc_period_before_general_still_refreshes_every_ten_seconds(self):
+    def test_ofc_period_before_general_still_refreshes_every_five_seconds(self):
         interval = get_detail_refresh_interval(
             self.event,
             True,
             datetime(2026, 8, 1, 9, 0, 0),
         )
 
-        self.assertEqual(interval, 10)
+        self.assertEqual(interval, 5)
 
     def test_closed_sales_refresh_every_sixty_seconds(self):
         interval = get_detail_refresh_interval(
@@ -67,7 +67,7 @@ class DetailRefreshIntervalTest(unittest.TestCase):
             datetime(2026, 8, 1, 17, 0, 0),
         )
 
-        self.assertEqual(before_close, 10)
+        self.assertEqual(before_close, 5)
         self.assertEqual(after_close, 60)
 
 

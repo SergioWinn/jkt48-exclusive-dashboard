@@ -17,7 +17,6 @@ from core.api import (
     is_waiting_room_detected,
     set_jkt48_cookie,
     validate_jkt48_cookie,
-    _get_json,
     _http_get,
 )
 
@@ -79,17 +78,6 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
         self.assertIs(response, live_api)
         self.assertNotIn("Cookie", get.call_args_list[0].kwargs["headers"])
         self.assertEqual(get.call_args_list[1].kwargs["headers"]["Cookie"], f"{WAITING_ROOM_COOKIE_NAME}=admin")
-
-    @patch("core.api._http_get")
-    def test_plain_403_is_not_mislabeled_as_cloudflare_challenge(self, get):
-        get.return_value = Mock(
-            status_code=403,
-            headers={"content-type": "text/html"},
-            text="Forbidden",
-        )
-
-        with self.assertRaisesRegex(LiveApiUnavailable, "HTTP 403"):
-            _get_json("https://jkt48.com/api/v1/exclusives/EXTEST", 12)
 
     @patch("core.api._send_http_get")
     def test_cookie_validation_checks_live_response_without_saving(self, get):

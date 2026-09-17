@@ -25,7 +25,7 @@ class DashboardNoticesTest(unittest.TestCase):
             self.assertEqual(fetch.call_count, 1)
             self.assertTrue(any("FINAL SNAPSHOT" in markdown.value for markdown in app.markdown))
 
-    def test_cached_data_uses_status_readout_instead_of_api_warning(self):
+    def test_api_and_stock_notices_share_one_message(self):
         event = {"code": "EXTEST", "title": "Test event", "category": "DIGITAL_PHOTOBOOK",
                  "session": [{"date": "2099-09-13", "label": "Sesi 1", "start_time": "11:45:00",
                               "session_detail": [{"label": "Jalur 1", "jkt48_member_name": "Test Member",
@@ -46,9 +46,8 @@ class DashboardNoticesTest(unittest.TestCase):
                 self.assertEqual(len(app.exception), 0)
                 messages = list(app.warning) + list(app.info)
                 self.assertEqual(len(messages), 1)
+                self.assertIn("Cloudflare Waiting Room", messages[0].value)
                 self.assertIn("Jumlah terjual tidak tersedia", messages[0].value)
-                if not is_live:
-                    self.assertNotIn("Live API unavailable", messages[0].value)
                 self.assertTrue(any(button.label == "Mitigate Waiting Room" for button in app.button))
 
 

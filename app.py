@@ -220,7 +220,13 @@ def _render_dashboard(
     st.session_state[f"sales_stats_available_{event_code}"] = sales_data_available
     notices = []
 
-    if not has_event_detail and not wr_info.get("is_live") and not event_closed:
+    if has_event_detail and not wr_info.get("is_live") and not event_closed:
+        notices.append(
+            f"Live API unavailable ({wr_info.get('reason', 'Waiting Room / upstream down')}). "
+            f"Showing last known good data ({wr_info.get('time')}). "
+            f"Retrying every {refresh_interval}s."
+        )
+    elif not has_event_detail and not wr_info.get("is_live") and not event_closed:
         notices.append(
             f"Event sessions are unavailable ({wr_info.get('reason', 'Waiting Room / upstream down')}). "
             f"No cached session data exists for this event yet. Retrying every {refresh_interval}s."

@@ -134,8 +134,8 @@ def _render_dashboard(
     if manual_refresh:
         if wr_info.get("is_live") and not wr_info.get("reason"):
             st.success("Data berhasil dimuat ulang dari API.")
-        else:
-            st.warning("Refresh belum berhasil sepenuhnya. " + _humanize_api_reason(wr_info.get("reason")))
+        elif not has_event_detail:
+            st.warning("Refresh gagal. Data sesi belum tersedia.")
 
     if closed and wr_info.get("is_live"):
         source_class = "is-cached"

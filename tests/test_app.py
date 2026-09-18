@@ -30,6 +30,12 @@ class DashboardNoticesTest(unittest.TestCase):
             clear_exclusive_detail_cache()
             app.run(timeout=15)
             self.assertEqual(get_json.call_count, 4)
+            app.button(key="manual_refresh").click().run(timeout=15)
+            self.assertEqual(len(app.exception), 0)
+            self.assertEqual(len(app.warning), 0)
+            self.assertEqual(app.session_state["event_data_EXRECOVER"], event)
+            self.assertFalse(app.session_state["wr_status_EXRECOVER"]["is_live"])
+            self.assertTrue(any("CACHED DATA" in m.value for m in app.markdown))
             get_json.side_effect = [{"status": True, "data": event}, {"status": True, "data": [{
                 "date": "2000-01-01", "start_time": "11:00", "session_members": [{
                     "label": "1", "member_name": "Member", "available_quota": 2,

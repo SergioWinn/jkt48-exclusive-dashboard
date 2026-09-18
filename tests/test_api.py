@@ -183,6 +183,24 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
         self.assertEqual(events, [])
         self.assertNotIn("EXOLD", [event.get("code") for event in events])
 
+    @patch("core.api._read_cache")
+    @patch("core.api._get_json", side_effect=LiveApiUnavailable("Cloudflare challenge"))
+    def test_active_fallback_event_with_future_end_date_is_not_dropped(self, _get_json, read_cache):
+        get_active_exclusive_events.clear()
+        active_payload = {
+            "last_updated": "18/09/2026 12:13:38 WIB",
+            "data": [{
+                "code": "EXFUTURE",
+                "valid_date_from": "2026-06-15T05:00:00.000Z",
+                "valid_date_to": "2026-10-01T23:59:59.000Z",
+            }],
+        }
+        read_cache.side_effect = [None, active_payload]
+
+        events = get_active_exclusive_events()
+
+        self.assertEqual([event["code"] for event in events], ["EXFUTURE"])
+
     @patch("builtins.open", side_effect=PermissionError)
     @patch("core.api._get_json")
     def test_cache_write_failure_does_not_discard_live_detail(self, get_json, _open):

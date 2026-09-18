@@ -319,22 +319,33 @@ def _filter_recent_fallback_events(events, now_wib=None):
     for event in events or []:
         if not isinstance(event, dict) or not event.get("code"):
             continue
+
         valid_from = event.get("valid_date_from")
+        valid_to = event.get("valid_date_to")
+        parsed_from = None
+        parsed_to = None
+
         if valid_from:
             try:
                 parsed_from = datetime.fromisoformat(str(valid_from).replace("Z", "").split(".")[0]) + timedelta(hours=7)
-                if now_wib - parsed_from > timedelta(days=MAX_FALLBACK_AGE_DAYS):
-                    continue
             except ValueError:
-                pass
-        valid_to = event.get("valid_date_to")
+                parsed_from = None
+
         if valid_to:
             try:
                 parsed_to = datetime.fromisoformat(str(valid_to).replace("Z", "").split(".")[0]) + timedelta(hours=7)
-                if now_wib >= parsed_to:
-                    continue
             except ValueError:
-                pass
+                parsed_to = None
+
+        if parsed_to is not None:
+            if now_wib >= parsed_to:
+                continue
+            filtered.append(event)
+            continue
+
+        if parsed_from is not None and now_wib - parsed_from > timedelta(days=MAX_FALLBACK_AGE_DAYS):
+            continue
+
         filtered.append(event)
     return filtered
 

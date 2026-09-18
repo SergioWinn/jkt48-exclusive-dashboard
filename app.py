@@ -131,12 +131,6 @@ def _render_dashboard(
     refresh_interval = get_detail_refresh_interval(event_data, wr_info.get("is_live", True), now_wib)
     has_event_detail = isinstance(event_data.get("session"), list)
 
-    if manual_refresh:
-        if wr_info.get("is_live") and not wr_info.get("reason"):
-            st.success("Data berhasil dimuat ulang dari API.")
-        elif not has_event_detail:
-            st.warning("Refresh gagal. Data sesi belum tersedia.")
-
     if closed and wr_info.get("is_live"):
         source_class = "is-cached"
         source_label = "FINAL SNAPSHOT"
@@ -174,6 +168,9 @@ def _render_dashboard(
                 clear_exclusive_detail_cache()
                 st.session_state["manual_refresh_requested"] = True
                 st.rerun()
+            if is_admin and manual_refresh:
+                succeeded = has_event_detail and wr_info.get("is_live") and not wr_info.get("reason")
+                st.caption(":green[Successful]" if succeeded else ":orange[Failed]", width="content")
             st.markdown(
                 f'<div class="source-readout {source_class}">'
                 f'<strong>{source_label}</strong>'

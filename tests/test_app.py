@@ -33,6 +33,7 @@ class DashboardNoticesTest(unittest.TestCase):
             app.button(key="manual_refresh").click().run(timeout=15)
             self.assertEqual(len(app.exception), 0)
             self.assertEqual(len(app.warning), 0)
+            self.assertTrue(any(c.value == ":orange[Failed]" for c in app.caption))
             self.assertEqual(app.session_state["event_data_EXRECOVER"], event)
             self.assertFalse(app.session_state["wr_status_EXRECOVER"]["is_live"])
             self.assertTrue(any("CACHED DATA" in m.value for m in app.markdown))
@@ -44,6 +45,8 @@ class DashboardNoticesTest(unittest.TestCase):
             app.button(key="manual_refresh").click().run(timeout=15)
             self.assertEqual(len(app.exception), 0)
             self.assertTrue(app.session_state["wr_status_EXRECOVER"]["is_live"])
+            self.assertEqual(len(app.success), 0)
+            self.assertTrue(any(c.value == ":green[Successful]" for c in app.caption))
             self.assertEqual(app.session_state["event_data_EXRECOVER"]["session"][0]["session_detail"][0]["available_quota"], 2)
             clear_exclusive_detail_cache()
 

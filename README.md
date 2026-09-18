@@ -12,7 +12,6 @@ This project is built as an operational tracker: it polls public event data, fal
 - Member, generation, and team ranking statistics.
 - Responsive statistics dialog with compact mobile member cards.
 - Admin-only image capture for dashboard cards and statistics rankings.
-- Waiting Room mitigation support through temporary Cloudflare cookie input.
 - Local runtime cache and bundled fallback snapshots for upstream interruptions.
 
 ## Tech Stack
@@ -87,7 +86,7 @@ http://localhost:8501/?akses=replace-with-your-local-admin-key
 JKT48_COOKIE
 ```
 
-Use this only when Cloudflare Waiting Room mitigation is required. The app also provides an admin-only dialog to set a temporary runtime cookie without storing it in the repository.
+Use this only when Cloudflare Waiting Room mitigation is required. Cookies are configured through the environment; the dashboard has no cookie input dialog.
 
 ## Testing
 

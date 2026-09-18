@@ -46,7 +46,8 @@ class DashboardNoticesTest(unittest.TestCase):
                 self.assertEqual(len(app.exception), 0)
                 messages = list(app.warning) + list(app.info)
                 self.assertEqual(len(messages), 1)
-                self.assertIn("Cloudflare Waiting Room", messages[0].value)
+                self.assertIn("cloudflare", messages[0].value.lower())
+                self.assertIn("menampilkan data", messages[0].value.lower())
                 self.assertIn("Jumlah terjual tidak tersedia", messages[0].value)
                 self.assertFalse(any(button.label == "Mitigate Waiting Room" for button in app.button))
 

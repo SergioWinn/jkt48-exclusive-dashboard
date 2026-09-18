@@ -28,6 +28,23 @@ CATEGORY_LABELS = {
     "PHOTOCARD": "Meet & Greet",
 }
 
+
+def _humanize_api_reason(reason):
+    raw_reason = (reason or "").strip()
+    normalized = raw_reason.lower()
+    if "waiting room" in normalized or "__cfwaitingroom" in normalized:
+        return "Situs JKT48 sedang dalam antrean keamanan Cloudflare (Waiting Room). Kami menampilkan data terakhir yang tersedia sementara proses verifikasi berjalan."
+    if "cloudflare challenge" in normalized or "just a moment" in normalized or "cf-chl" in normalized:
+        return "Situs JKT48 sedang menjalani verifikasi keamanan Cloudflare. Data terbaru mungkin tertunda sementara sistem memvalidasi akses."
+    if "connection failed" in normalized:
+        return "Koneksi ke server JKT48 terganggu. Kami menampilkan data terakhir yang berhasil disimpan."
+    if "bonus:" in normalized:
+        return "Sisa stok bonus belum bisa dimuat. Menampilkan data API utama yang tersedia."
+    if raw_reason:
+        return raw_reason
+    return "Layanan JKT48 sedang tidak dapat diakses saat ini."
+
+
 ASSETS_DIR = Path(__file__).parent / "assets"
 
 # --- 1. PAGE CONFIGURATION ---
@@ -162,25 +179,27 @@ def _render_dashboard(
     st.session_state[f"sales_stats_available_{event_code}"] = sales_data_available
     notices = []
 
+    friendly_reason = _humanize_api_reason(wr_info.get("reason"))
+
     if has_event_detail and not wr_info.get("is_live") and not event_closed:
         notices.append(
-            f"Live API unavailable ({wr_info.get('reason', 'Waiting Room / upstream down')}). "
-            f"Showing last known good data ({wr_info.get('time')}). "
-            f"Retrying every {refresh_interval}s."
+            f"{friendly_reason} "
+            f"Kami tetap menampilkan data terakhir yang berhasil disimpan ({wr_info.get('time')}). "
+            f"Proses pembaruan otomatis akan mencoba lagi dalam {refresh_interval} detik."
         )
     elif not has_event_detail and not wr_info.get("is_live") and not event_closed:
         notices.append(
-            f"Event sessions are unavailable ({wr_info.get('reason', 'Waiting Room / upstream down')}). "
-            f"No cached session data exists for this event yet. Retrying every {refresh_interval}s."
+            f"{friendly_reason} "
+            f"Belum ada data sesi yang tersimpan untuk event ini. "
+            f"Proses pembaruan otomatis akan mencoba lagi dalam {refresh_interval} detik."
         )
     elif not has_event_detail and not event_closed:
         notices.append(
-            f"Session and ticket details are unavailable. Showing event list information only; "
-            f"retrying every {refresh_interval}s."
+            "Detail sesi dan stok belum tersedia. Kami menampilkan daftar event saja sementara proses sinkronisasi berjalan."
         )
 
     if wr_info.get("is_live") and wr_info.get("reason"):
-        notices.append(f"Sisa stok bonus belum berhasil dimuat ({wr_info['reason']}). Menampilkan data API utama.")
+        notices.append(f"{_humanize_api_reason(wr_info['reason'])} Menampilkan data API utama.")
     if has_event_detail and not sales_data_available:
         notices.append("Jumlah terjual tidak tersedia dari API. Kartu menampilkan sisa stok jika tersedia, atau status ketersediaan.")
 

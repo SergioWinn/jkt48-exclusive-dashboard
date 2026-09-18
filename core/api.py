@@ -222,6 +222,19 @@ def _read_cache(cache_file):
         return None
 
 
+def _read_latest_cache(runtime_file, bundled_file):
+    candidates = [_read_cache(runtime_file), _read_cache(bundled_file)]
+
+    def updated(payload):
+        try:
+            return datetime.strptime(payload.get("last_updated", ""), "%d/%m/%Y %H:%M:%S WIB")
+        except (TypeError, ValueError):
+            return datetime.min
+
+    return max((p for p in candidates if isinstance(p, dict) and p.get("data")),
+               key=updated, default=None)
+
+
 @st.cache_data(ttl=30)
 def get_member_database():
     url = "https://jkt48.com/api/v1/members?lang=id"
@@ -267,7 +280,7 @@ def get_active_exclusive_events():
         )
         return live_events
     except LiveApiUnavailable:
-        cached_events = _read_cache(cache_file)
+        cached_events = _read_latest_cache(cache_file, os.path.join("data", "fallback", "exclusive_events.json"))
         if cached_events and cached_events.get("data"):
             return cached_events["data"]
         return KNOWN_EXCLUSIVE_EVENTS.copy()
@@ -330,7 +343,7 @@ def _fetch_exclusive_detail_shared(code):
             raise LiveApiUnavailable("Exclusive detail is missing")
     except LiveApiUnavailable as error:
         is_live, reason = False, str(error)
-        cache_payload = _read_cache(cache_file) or _read_cache(bundled_cache_file)
+        cache_payload = _read_latest_cache(cache_file, bundled_cache_file)
         if cache_payload and cache_payload.get("data"):
             data = cache_payload["data"]
             time_label = cache_payload.get("last_updated", "Unknown")

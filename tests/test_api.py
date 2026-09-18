@@ -22,6 +22,15 @@ from core.api import (
 
 
 class GetActiveExclusiveEventsTest(unittest.TestCase):
+    @patch("core.api._read_cache")
+    @patch("core.api._get_json", side_effect=LiveApiUnavailable("Cloudflare challenge"))
+    def test_newer_bundled_catalogue_survives_old_runtime_cache(self, _get_json, read_cache):
+        read_cache.side_effect = [
+            {"last_updated": "31/07/2026 13:02:35 WIB", "data": [{"code": "EXOLD"}]},
+            {"last_updated": "18/09/2026 12:13:38 WIB", "data": [{"code": "EXNEW"}]},
+        ]
+        self.assertEqual(get_active_exclusive_events(), [{"code": "EXNEW"}])
+
     def tearDown(self):
         get_active_exclusive_events.clear()
         get_member_database.clear()

@@ -41,7 +41,7 @@ AKB48_PHOTO_MAP = {
     "haruka kurosu": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100937.jpg",
     "ayami nagatomo": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100943.jpg",
     "orin muto": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100949.jpg",
-    "mizuki yamauchi": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83101007.jpg",
+    "mizuki yamauchi": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100951.jpg",
     "suzuha yamane": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100952.jpg",
     "yuki ota": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100998.jpg",
     "airi sato": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83101000.jpg",

@@ -137,7 +137,8 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
 
         _, photos = get_member_database()
 
-        self.assertEqual(photos["mizuki yamauchi"], "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83101007.jpg")
+        self.assertEqual(photos["mizuki yamauchi"], "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100951.jpg")
+        self.assertEqual(photos["miyuu mizushima"], "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83101007.jpg")
         self.assertEqual(photos["yui oguri"], "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100816.jpg")
 
     @patch("core.api._write_cache")

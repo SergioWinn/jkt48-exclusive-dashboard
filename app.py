@@ -139,16 +139,16 @@ def _render_dashboard(
         source_class = "is-unavailable"
         source_label = "LIST ONLY"
         source_detail = "Session details unavailable"
-        sync_label = f"Retrying every {refresh_interval}s"
+        sync_label = "Waiting for session data"
     elif wr_info.get("is_live"):
         source_class = "is-live"
         source_label = "LIVE DATA"
-        source_detail = f"{refresh_interval}s poll interval"
+        source_detail = "Auto refresh"
         sync_label = wr_info.get("time") or "Waiting for first sync"
     else:
         source_class = "is-cached"
         source_label = "CACHED DATA"
-        source_detail = f"Retrying every {refresh_interval}s"
+        source_detail = "Last snapshot"
         sync_label = wr_info.get("time") or "Unknown snapshot time"
     event_title = escape(str(event_data.get("title", "Event")))
     raw_category = str(event_data.get("category", "-"))
@@ -184,14 +184,12 @@ def _render_dashboard(
     if has_event_detail and not wr_info.get("is_live") and not event_closed:
         notices.append(
             f"{friendly_reason} "
-            f"Kami tetap menampilkan data terakhir yang berhasil disimpan ({wr_info.get('time')}). "
-            f"Proses pembaruan otomatis akan mencoba lagi dalam {refresh_interval} detik."
+            f"Kami tetap menampilkan data terakhir yang berhasil disimpan ({wr_info.get('time')})."
         )
     elif not has_event_detail and not wr_info.get("is_live") and not event_closed:
         notices.append(
             f"{friendly_reason} "
-            f"Belum ada data sesi yang tersimpan untuk event ini. "
-            f"Proses pembaruan otomatis akan mencoba lagi dalam {refresh_interval} detik."
+            f"Belum ada data sesi yang tersimpan untuk event ini."
         )
     elif not has_event_detail and not event_closed:
         notices.append(

@@ -25,6 +25,7 @@ RUNTIME_CACHE_DIR = ".runtime_cache"
 _runtime_jkt48_cookie = None
 _waiting_room_detected = False
 WAITING_ROOM_COOKIE_NAME = "__cfwaitingroom_q7VnL4xM2pK8dR5sT1wY9cB6hJ3uF0zA7eG2mN5Q8"
+MAX_FALLBACK_AGE_DAYS = 30
 AKB48_PHOTO_MAP = {
     "saho iwatate": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100622.jpg",
     "seina fukuoka": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100790.jpg",
@@ -312,10 +313,37 @@ def get_member_database():
     return nickname_map, photo_map
 
 
+def _filter_recent_fallback_events(events, now_wib=None):
+    now_wib = now_wib or (datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=7))
+    filtered = []
+    for event in events or []:
+        if not isinstance(event, dict) or not event.get("code"):
+            continue
+        valid_from = event.get("valid_date_from")
+        if valid_from:
+            try:
+                parsed_from = datetime.fromisoformat(str(valid_from).replace("Z", "").split(".")[0]) + timedelta(hours=7)
+                if now_wib - parsed_from > timedelta(days=MAX_FALLBACK_AGE_DAYS):
+                    continue
+            except ValueError:
+                pass
+        valid_to = event.get("valid_date_to")
+        if valid_to:
+            try:
+                parsed_to = datetime.fromisoformat(str(valid_to).replace("Z", "").split(".")[0]) + timedelta(hours=7)
+                if now_wib >= parsed_to:
+                    continue
+            except ValueError:
+                pass
+        filtered.append(event)
+    return filtered
+
+
 @st.cache_data(ttl=30)
 def get_active_exclusive_events():
     url = "https://jkt48.com/api/v1/exclusives?lang=id"
     cache_file = os.path.join(RUNTIME_CACHE_DIR, "exclusive_events.json")
+    now_wib = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
     try:
         res_json = _get_json(url, 20)
         data_content = res_json.get("data", [])
@@ -324,7 +352,6 @@ def get_active_exclusive_events():
         if not live_events:
             raise LiveApiUnavailable("Exclusive event list is empty")
         live_events.sort(key=lambda event: event.get("valid_date_from") or "", reverse=True)
-        now_wib = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
         _write_cache(
             cache_file,
             {"last_updated": now_wib.strftime('%d/%m/%Y %H:%M:%S WIB'), "data": live_events},
@@ -333,8 +360,11 @@ def get_active_exclusive_events():
     except LiveApiUnavailable:
         cached_events = _read_latest_cache(cache_file, os.path.join("data", "fallback", "exclusive_events.json"))
         if cached_events and cached_events.get("data"):
-            return cached_events["data"]
-        return KNOWN_EXCLUSIVE_EVENTS.copy()
+            fresh_cached = _filter_recent_fallback_events(cached_events["data"], now_wib)
+            if fresh_cached:
+                return fresh_cached
+        fallback_events = _filter_recent_fallback_events(KNOWN_EXCLUSIVE_EVENTS.copy(), now_wib)
+        return fallback_events
 
 
 def _bonus_stock_key(session, label, member_name):

@@ -144,6 +144,7 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
     @patch("core.api._write_cache")
     @patch("core.api._get_json")
     def test_live_response_is_used_without_manual_event_list(self, get_json, write_cache):
+        get_active_exclusive_events.clear()
         live_event = {
             "code": "EXNEW1",
             "category": "DIGITAL_PHOTOBOOK",
@@ -160,11 +161,27 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
     @patch("core.api._read_cache")
     @patch("core.api._get_json", side_effect=LiveApiUnavailable("Cloudflare Waiting Room"))
     def test_event_list_falls_back_when_live_api_is_unavailable(self, _get_json, read_cache):
+        get_active_exclusive_events.clear()
         read_cache.return_value = {"last_updated": "now", "data": KNOWN_EXCLUSIVE_EVENTS}
 
         events = get_active_exclusive_events()
 
-        self.assertEqual(events, KNOWN_EXCLUSIVE_EVENTS)
+        self.assertEqual(events, [])
+
+    @patch("core.api._read_cache")
+    @patch("core.api._get_json", side_effect=LiveApiUnavailable("Cloudflare challenge"))
+    def test_stale_manual_fallback_json_is_ignored(self, _get_json, read_cache):
+        get_active_exclusive_events.clear()
+        stale_payload = {
+            "last_updated": "31/07/2026 13:02:35 WIB",
+            "data": [{"code": "EXOLD", "valid_date_from": "2026-07-16T13:00:00.000Z", "valid_date_to": "2026-07-31T23:59:59.000Z"}],
+        }
+        read_cache.side_effect = [None, stale_payload]
+
+        events = get_active_exclusive_events()
+
+        self.assertEqual(events, [])
+        self.assertNotIn("EXOLD", [event.get("code") for event in events])
 
     @patch("builtins.open", side_effect=PermissionError)
     @patch("core.api._get_json")
@@ -229,6 +246,7 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
     @patch("core.api._read_cache")
     @patch("core.api._get_json")
     def test_bonus_refreshes_cached_stock_when_detail_is_rate_limited(self, get_json, read_cache, write_cache, status):
+        clear_exclusive_detail_cache()
         cached = {"code": "EX5A08", "session": [{
             "date": "2026-09-13T00:00:00", "start_time": "11:45", "label": "Session 1 (Sunday)",
             "session_detail": [{"label": "Jalur 1", "jkt48_member_name": "Jacqueline Immanuela",
@@ -277,17 +295,13 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
         self.assertTrue(status.call_args.args[1])
         self.assertEqual(write_cache.call_args.args[1]["data"], data)
 
-    def test_every_known_event_has_bundled_detail(self):
+    def test_legacy_event_json_files_are_removed(self):
         project_root = Path(__file__).parent.parent
+        fallback_dir = project_root / "data" / "fallback"
 
-        for event in KNOWN_EXCLUSIVE_EVENTS:
-            cache_file = project_root / "data" / "fallback" / f"{event['code']}.json"
-            with self.subTest(code=event["code"]):
-                self.assertTrue(cache_file.exists())
-                with cache_file.open(encoding="utf-8") as file:
-                    cached_event = json.load(file)["data"]
-                self.assertEqual(cached_event["code"], event["code"])
-                self.assertEqual(cached_event["category"], event["category"])
+        remaining_files = sorted(path.name for path in fallback_dir.glob("*.json"))
+
+        self.assertEqual(remaining_files, ["exclusive_events.json", "members.json"])
 
 
 if __name__ == "__main__":

@@ -254,10 +254,13 @@ def get_member_database():
                     photo_map[name] = photo
         if photo_map:
             _write_cache(cache_file, {"nickname_map": nickname_map, "photo_map": photo_map})
+        else:
+            raise LiveApiUnavailable("Member photos are empty")
     except Exception:
+        bundled_members = _read_cache(os.path.join("data", "fallback", "members.json")) or {}
         cached_members = _read_cache(cache_file) or {}
-        nickname_map = cached_members.get("nickname_map", {})
-        photo_map = cached_members.get("photo_map", {})
+        nickname_map = {**bundled_members.get("nickname_map", {}), **cached_members.get("nickname_map", {})}
+        photo_map = {**bundled_members.get("photo_map", {}), **cached_members.get("photo_map", {})}
     return nickname_map, photo_map
 
 

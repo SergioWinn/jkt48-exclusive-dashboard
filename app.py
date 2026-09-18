@@ -73,6 +73,7 @@ access_key = st.query_params.get("akses", "")
 is_admin = bool(access_key and access_key in admin_keys)
 
 if is_admin and st.button("Refresh data sekarang", icon=":material/refresh:"):
+    get_member_database.clear()
     get_active_exclusive_events.clear()
     clear_exclusive_detail_cache()
     st.session_state["manual_refresh_requested"] = True

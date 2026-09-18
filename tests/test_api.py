@@ -22,6 +22,17 @@ from core.api import (
 
 
 class GetActiveExclusiveEventsTest(unittest.TestCase):
+    @patch("core.api._get_json")
+    def test_member_photos_survive_missing_runtime_cache_and_empty_api(self, get_json):
+        for result in (LiveApiUnavailable("Cloudflare challenge"), {"status": True, "data": []}):
+            with self.subTest(result=result):
+                get_member_database.clear()
+                get_json.side_effect = [result]
+                with patch("core.api.RUNTIME_CACHE_DIR", "missing-cache-for-photo-test"):
+                    nicknames, photos = get_member_database()
+                self.assertEqual(nicknames["aralie"], "abigail rachel")
+                self.assertTrue(photos["abigail rachel"].startswith("https://jkt48.com/"))
+
     @patch("core.api._read_cache")
     @patch("core.api._get_json", side_effect=LiveApiUnavailable("Cloudflare challenge"))
     def test_newer_bundled_catalogue_survives_old_runtime_cache(self, _get_json, read_cache):

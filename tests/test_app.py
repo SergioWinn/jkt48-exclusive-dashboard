@@ -55,18 +55,25 @@ class DashboardNoticesTest(unittest.TestCase):
              patch("core.api.get_member_database", return_value=({}, {})), \
              patch("core.api.fetch_exclusive_detail", return_value=event) as fetch:
             app = AppTest.from_file(str(Path(__file__).parents[1] / "app.py"))
+            app.session_state["wr_status_EXCLOSED"] = {
+                "is_live": True, "reason": "bonus: HTTP 404", "time": "last sync",
+            }
             app.run(timeout=15)
             self.assertEqual(len(app.exception), 0)
             self.assertEqual(fetch.call_count, 1)
             self.assertTrue(any("FINAL SNAPSHOT" in markdown.value for markdown in app.markdown))
+            status = next(m.value for m in app.markdown if "FINAL SNAPSHOT" in m.value)
+            self.assertTrue(all(line.strip() for line in status.splitlines()))
+            self.assertEqual(len(app.warning) + len(app.info), 0)
 
     def test_api_and_stock_notices_share_one_message(self):
         event = {"code": "EXTEST", "title": "Test event", "category": "DIGITAL_PHOTOBOOK",
                  "session": [{"date": "2099-09-13", "label": "Sesi 1", "start_time": "11:45:00",
                               "session_detail": [{"label": "Jalur 1", "jkt48_member_name": "Test Member",
                                                   "available_quota": 9}]}]}
-        for is_live in (False, True):
-            with self.subTest(is_live=is_live), \
+        for is_live, reason in ((False, "Cloudflare Waiting Room"),
+                                (True, "Cloudflare Waiting Room"), (True, "bonus: HTTP 404")):
+            with self.subTest(is_live=is_live, reason=reason), \
                  patch("core.api.get_active_exclusive_events", return_value=[event]), \
                  patch("core.api.get_member_database", return_value=({}, {})), \
                  patch("core.api.fetch_exclusive_detail", return_value=event), \
@@ -75,13 +82,16 @@ class DashboardNoticesTest(unittest.TestCase):
                 app.secrets["ADMIN_KEYS"] = ["test-key"]
                 app.query_params["akses"] = "test-key"
                 app.session_state["wr_status_EXTEST"] = {
-                    "is_live": is_live, "reason": "Cloudflare Waiting Room", "time": "last sync",
+                    "is_live": is_live, "reason": reason, "time": "last sync",
                 }
                 app.run(timeout=15)
                 self.assertEqual(len(app.exception), 0)
                 messages = list(app.warning) + list(app.info)
                 self.assertEqual(len(messages), 1)
-                self.assertIn("cloudflare", messages[0].value.lower())
+                if reason.startswith("bonus:"):
+                    self.assertEqual(messages[0].value.count("Menampilkan data API utama"), 1)
+                else:
+                    self.assertIn("cloudflare", messages[0].value.lower())
                 self.assertIn("menampilkan data", messages[0].value.lower())
                 self.assertIn("Jumlah terjual tidak tersedia", messages[0].value)
                 self.assertFalse(any(button.label == "Mitigate Waiting Room" for button in app.button))

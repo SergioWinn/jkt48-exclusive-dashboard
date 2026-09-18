@@ -177,8 +177,7 @@ def _render_dashboard(
             </div>
             <div class="source-readout {source_class}">
                 <strong>{source_label}</strong>
-                <span>{source_detail}</span>
-                {sync_markup}
+                <span>{source_detail}</span>{sync_markup}
             </div>
         </section>
         """,
@@ -210,9 +209,9 @@ def _render_dashboard(
             "Detail sesi dan stok belum tersedia. Kami menampilkan daftar event saja sementara proses sinkronisasi berjalan."
         )
 
-    if wr_info.get("is_live") and wr_info.get("reason"):
-        notices.append(f"{_humanize_api_reason(wr_info['reason'])} Menampilkan data API utama.")
-    if has_event_detail and not sales_data_available:
+    if not event_closed and wr_info.get("is_live") and wr_info.get("reason"):
+        notices.append(friendly_reason)
+    if not event_closed and has_event_detail and not sales_data_available:
         notices.append("Jumlah terjual tidak tersedia dari API. Kartu menampilkan sisa stok jika tersedia, atau status ketersediaan.")
 
     if notices:

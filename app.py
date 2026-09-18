@@ -184,12 +184,12 @@ def _render_dashboard(
     if has_event_detail and not wr_info.get("is_live") and not event_closed:
         notices.append(
             f"{friendly_reason} "
-            f"Kami tetap menampilkan data terakhir yang berhasil disimpan ({wr_info.get('time')})."
+            "Data yang ditampilkan adalah snapshot terakhir yang berhasil disimpan."
         )
     elif not has_event_detail and not wr_info.get("is_live") and not event_closed:
         notices.append(
             f"{friendly_reason} "
-            f"Belum ada data sesi yang tersimpan untuk event ini."
+            "Belum ada data sesi yang tersimpan untuk event ini."
         )
     elif not has_event_detail and not event_closed:
         notices.append(

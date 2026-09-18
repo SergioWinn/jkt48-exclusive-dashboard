@@ -49,8 +49,9 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
         set_jkt48_cookie("")
 
     @patch("core.api.USING_BROWSER_CLIENT", False)
-    @patch("core.api.browser_requests.get")
-    def test_admin_cookie_is_only_sent_after_waiting_room(self, get):
+    @patch("core.api._get_http_session")
+    def test_admin_cookie_is_only_sent_after_waiting_room(self, get_session):
+        get = get_session.return_value.get
         waiting_room = Mock(
             status_code=200,
             headers={"content-type": "text/html"},
@@ -82,8 +83,9 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
                 build_jkt48_cookie(value)
 
     @patch("core.api.USING_BROWSER_CLIENT", False)
-    @patch("core.api.browser_requests.get")
-    def test_admin_cookie_retries_cloudflare_challenge_for_member_photos(self, get):
+    @patch("core.api._get_http_session")
+    def test_admin_cookie_retries_cloudflare_challenge_for_member_photos(self, get_session):
+        get = get_session.return_value.get
         challenge = Mock(
             status_code=403,
             headers={"content-type": "text/html"},

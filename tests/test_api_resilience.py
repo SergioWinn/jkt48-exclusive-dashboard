@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from threading import local
 from unittest.mock import Mock, patch
 
 from core import api
@@ -60,12 +61,30 @@ class ApiResilienceTest(unittest.TestCase):
         write.assert_called_once()
 
     @patch("core.api.USING_BROWSER_CLIENT", True)
-    @patch("core.api.browser_requests.get", side_effect=TimeoutError)
-    def test_timeout_does_not_multiply_browser_attempts(self, get):
+    @patch("core.api._get_http_session")
+    def test_timeout_does_not_multiply_browser_attempts(self, get_session):
+        get = get_session.return_value.get
+        get.side_effect = TimeoutError
         with self.assertRaises(api.LiveApiUnavailable):
             api._get_json("https://jkt48.com/api/v1/members", 20)
         get.assert_called_once()
         self.assertEqual(get.call_args.kwargs["timeout"], 5)
+        self.assertEqual(get_session.return_value.cookies.clear.call_count, 2)
+
+    @patch("core.api.USING_BROWSER_CLIENT", True)
+    @patch("core.api._http_clients", new_callable=local)
+    @patch("core.api.browser_requests.Session")
+    def test_session_reuses_connections_without_retaining_cookies(self, factory, _clients):
+        for _ in range(2):
+            api._send_http_get("https://jkt48.com/api/v1/members", 12, api.FALLBACK_HEADERS)
+        factory.assert_called_once_with()
+        self.assertEqual(factory.return_value.get.call_count, 2)
+        self.assertEqual(factory.return_value.cookies.clear.call_count, 4)
+        options = factory.return_value.get.call_args.kwargs
+        self.assertEqual(options["impersonate"], "chrome136")
+        self.assertTrue(options["discard_cookies"])
+        self.assertNotIn("User-Agent", options["headers"])
+        self.assertIn("User-Agent", api.FALLBACK_HEADERS)
 
     @patch("core.api._http_get", return_value=Mock(status_code=403, headers={"content-type": "text/html"}, text="Forbidden"))
     def test_plain_403_is_not_a_cloudflare_challenge(self, _get):

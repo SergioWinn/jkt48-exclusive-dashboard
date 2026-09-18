@@ -2,6 +2,7 @@
 
 import json
 import os
+import tempfile
 from datetime import datetime, timedelta, timezone
 
 import streamlit as st
@@ -25,7 +26,7 @@ RUNTIME_CACHE_DIR = ".runtime_cache"
 _runtime_jkt48_cookie = None
 _waiting_room_detected = False
 WAITING_ROOM_COOKIE_NAME = "__cfwaitingroom_q7VnL4xM2pK8dR5sT1wY9cB6hJ3uF0zA7eG2mN5Q8"
-MAX_FALLBACK_AGE_DAYS = 30
+MAX_FALLBACK_AGE_DAYS = 365
 AKB48_PHOTO_MAP = {
     "saho iwatate": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100622.jpg",
     "seina fukuoka": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100790.jpg",
@@ -165,23 +166,9 @@ def _set_wr_status(code, is_live, time_label, reason=""):
 
 
 def _send_http_get(url, timeout, headers):
-    kwargs = {"timeout": timeout, "headers": headers}
+    kwargs = {"timeout": min(timeout, 5), "headers": headers}
     if USING_BROWSER_CLIENT:
-        responses = []
-        last_error = None
-        for browser in ("chrome136", "safari184"):
-            try:
-                response = browser_requests.get(url, impersonate=browser, **kwargs)
-            except Exception as error:
-                last_error = error
-                continue
-            responses.append(response)
-            content_type = response.headers.get("content-type", "").lower()
-            if response.status_code == 200 and "json" in content_type:
-                return response
-        if responses:
-            return responses[-1]
-        raise last_error or RuntimeError("No HTTP response")
+        return browser_requests.get(url, impersonate="chrome136", **kwargs)
     return browser_requests.get(url, **kwargs)
 
 
@@ -200,7 +187,7 @@ def _is_cloudflare_gate_response(response):
     if "json" in content_type:
         return False
     body_start = response.text[:1000].lower()
-    return response.status_code == 403 or "just a moment" in body_start or "cf-chl" in body_start
+    return response.headers.get("cf-mitigated") == "challenge" or "just a moment" in body_start or "cf-chl" in body_start
 
 
 def _http_get(url, timeout):
@@ -227,7 +214,7 @@ def _get_json(url, timeout, cookie=None):
 
     content_type = response.headers.get("content-type", "").lower()
     if response.status_code != 200:
-        reason = "Cloudflare challenge" if response.status_code == 403 else f"HTTP {response.status_code}"
+        reason = "Cloudflare challenge" if _is_cloudflare_gate_response(response) else f"HTTP {response.status_code}"
         raise LiveApiUnavailable(reason)
     if "json" not in content_type:
         body_start = response.text[:1000].lower()
@@ -250,14 +237,22 @@ def _get_json(url, timeout, cookie=None):
 
 
 def _write_cache(cache_file, payload):
+    temporary = None
     try:
-        parent_dir = os.path.dirname(cache_file)
-        if parent_dir:
-            os.makedirs(parent_dir, exist_ok=True)
-        with open(cache_file, "w", encoding="utf-8") as file:
+        parent_dir = os.path.dirname(cache_file) or "."
+        os.makedirs(parent_dir, exist_ok=True)
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=parent_dir, delete=False) as file:
+            temporary = file.name
             json.dump(payload, file)
+        os.replace(temporary, cache_file)
     except OSError:
         pass
+    finally:
+        if temporary and os.path.exists(temporary):
+            try:
+                os.unlink(temporary)
+            except OSError:
+                pass
 
 
 def _read_cache(cache_file):
@@ -265,7 +260,8 @@ def _read_cache(cache_file):
         return None
     try:
         with open(cache_file, "r", encoding="utf-8") as file:
-            return json.load(file)
+            payload = json.load(file)
+            return payload if isinstance(payload, dict) else None
     except (OSError, ValueError):
         return None
 
@@ -283,7 +279,7 @@ def _read_latest_cache(runtime_file, bundled_file):
                key=updated, default=None)
 
 
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=300, show_spinner=False)
 def get_member_database():
     url = "https://jkt48.com/api/v1/members?lang=id"
     cache_file = os.path.join(RUNTIME_CACHE_DIR, "members.json")
@@ -350,7 +346,7 @@ def _filter_recent_fallback_events(events, now_wib=None):
     return filtered
 
 
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=30, show_spinner=False)
 def get_active_exclusive_events():
     url = "https://jkt48.com/api/v1/exclusives?lang=id"
     cache_file = os.path.join(RUNTIME_CACHE_DIR, "exclusive_events.json")
@@ -358,8 +354,10 @@ def get_active_exclusive_events():
     try:
         res_json = _get_json(url, 20)
         data_content = res_json.get("data", [])
-        event_list = data_content if isinstance(data_content, list) else data_content.get("data", [])
-        live_events = [event for event in event_list if event.get("code")]
+        event_list = data_content.get("data") if isinstance(data_content, dict) else data_content
+        if not isinstance(event_list, list):
+            raise LiveApiUnavailable("Invalid event list")
+        live_events = [event for event in event_list if isinstance(event, dict) and isinstance(event.get("code"), str) and event["code"]]
         if not live_events:
             raise LiveApiUnavailable("Exclusive event list is empty")
         live_events.sort(key=lambda event: event.get("valid_date_from") or "", reverse=True)
@@ -376,6 +374,20 @@ def get_active_exclusive_events():
                 return fresh_cached
         fallback_events = _filter_recent_fallback_events(KNOWN_EXCLUSIVE_EVENTS.copy(), now_wib)
         return fallback_events
+
+
+def _validate_detail(data, code):
+    if not isinstance(data, dict) or data.get("code") != code:
+        raise LiveApiUnavailable("Exclusive detail is missing")
+    sessions = data.get("session", [])
+    if not isinstance(sessions, list):
+        raise LiveApiUnavailable("Invalid event sessions")
+    for session in sessions:
+        if not isinstance(session, dict) or not isinstance(session.get("session_detail", []), list):
+            raise LiveApiUnavailable("Invalid event session")
+        if any(not isinstance(member, dict) for member in session.get("session_detail", [])):
+            raise LiveApiUnavailable("Invalid event member")
+    return data
 
 
 def _bonus_stock_key(session, label, member_name):
@@ -430,14 +442,15 @@ def _fetch_exclusive_detail_shared(code):
     waktu_sekarang = now_wib.strftime('%d/%m/%Y %H:%M:%S WIB')
     is_live, reason, time_label = True, "", waktu_sekarang
     try:
-        data = _get_json(url, 12).get("data")
-        if not isinstance(data, dict) or not data.get("code"):
-            raise LiveApiUnavailable("Exclusive detail is missing")
+        data = _validate_detail(_get_json(url, 12).get("data"), code)
     except LiveApiUnavailable as error:
         is_live, reason = False, str(error)
         cache_payload = _read_latest_cache(cache_file, bundled_cache_file)
         if cache_payload and cache_payload.get("data"):
-            data = cache_payload["data"]
+            try:
+                data = _validate_detail(cache_payload["data"], code)
+            except LiveApiUnavailable:
+                data = None
             time_label = cache_payload.get("last_updated", "Unknown")
         else:
             data = EMERGENCY_EXCLUSIVE_DETAILS.get(code)
@@ -449,6 +462,17 @@ def _fetch_exclusive_detail_shared(code):
         is_live, reason, time_label = True, "", waktu_sekarang
     except LiveApiUnavailable as error:
         reason = f"{reason}; bonus: {error}" if reason else f"Bonus: {error}"
+        if is_live:
+            cached = _read_latest_cache(cache_file, bundled_cache_file)
+            if cached and cached.get("data"):
+                try:
+                    cached_data = _validate_detail(cached["data"], code)
+                except LiveApiUnavailable:
+                    cached_data = None
+                if cached_data:
+                    data = cached_data
+                    is_live = False
+                    time_label = cached.get("last_updated", "Unknown")
     if is_live:
         _write_cache(cache_file, {"last_updated": time_label, "data": data})
     return {"data": data, "is_live": is_live, "reason": reason, "time": time_label}

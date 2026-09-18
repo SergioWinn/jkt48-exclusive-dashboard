@@ -89,6 +89,12 @@ if isinstance(admin_keys, str):
 access_key = st.query_params.get("akses", "")
 is_admin = bool(access_key and access_key in admin_keys)
 
+if is_admin and st.button("Refresh data sekarang", icon=":material/refresh:"):
+    get_member_database.clear()
+    get_active_exclusive_events.clear()
+    clear_exclusive_detail_cache()
+    st.session_state["manual_refresh_requested"] = True
+
 def _render_dashboard(
     selected_event,
     search_query,
@@ -112,9 +118,10 @@ def _render_dashboard(
             st.rerun()
     refresh_interval = get_detail_refresh_interval(event_data, wr_info.get("is_live", True), now_wib)
     last_attempt = st.session_state.get(attempt_state_key, 0.0)
+    manual_refresh = st.session_state.pop("manual_refresh_requested", False)
 
-    should_fetch = event_state_key not in st.session_state or (
-        not closed and time.monotonic() - last_attempt >= refresh_interval
+    should_fetch = manual_refresh or event_state_key not in st.session_state or (
+        (not closed or not wr_info.get("is_live", True)) and time.monotonic() - last_attempt >= refresh_interval
     )
     if event_code and should_fetch:
         st.session_state[attempt_state_key] = time.monotonic()
@@ -130,11 +137,17 @@ def _render_dashboard(
     refresh_interval = get_detail_refresh_interval(event_data, wr_info.get("is_live", True), now_wib)
     has_event_detail = isinstance(event_data.get("session"), list)
 
-    if closed:
+    if manual_refresh:
+        if wr_info.get("is_live") and not wr_info.get("reason"):
+            st.success("Data berhasil dimuat ulang dari API.")
+        else:
+            st.warning("Refresh belum berhasil sepenuhnya. " + _humanize_api_reason(wr_info.get("reason")))
+
+    if closed and wr_info.get("is_live"):
         source_class = "is-cached"
         source_label = "FINAL SNAPSHOT"
         source_detail = "Auto refresh stopped"
-        sync_label = wr_info.get("time") or "Last available snapshot"
+        sync_label = ""
     elif not has_event_detail:
         source_class = "is-unavailable"
         source_label = "LIST ONLY"
@@ -154,6 +167,7 @@ def _render_dashboard(
     raw_category = str(event_data.get("category", "-"))
     event_category = escape(CATEGORY_LABELS.get(raw_category, raw_category.replace("_", " ")))
     event_price = int(event_data.get("default_price") or 0)
+    sync_markup = f"<small>{escape(str(sync_label))}</small>" if sync_label else ""
     st.markdown(
         f"""
         <section class="event-index-head">
@@ -164,7 +178,7 @@ def _render_dashboard(
             <div class="source-readout {source_class}">
                 <strong>{source_label}</strong>
                 <span>{source_detail}</span>
-                <small>{escape(str(sync_label))}</small>
+                {sync_markup}
             </div>
         </section>
         """,
@@ -256,7 +270,7 @@ def live_dashboard_fragment(*args):
     _render_dashboard(*args)
 
 
-@st.fragment
+@st.fragment(run_every=5)
 def closed_dashboard_fragment(*args):
     _render_dashboard(*args)
 

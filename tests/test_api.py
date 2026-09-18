@@ -166,22 +166,24 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
 
         events = get_active_exclusive_events()
 
-        self.assertEqual(events, [])
+        self.assertGreater(len(events), 0)
+        self.assertIn("EXE588", [event.get("code") for event in events])
 
     @patch("core.api._read_cache")
     @patch("core.api._get_json", side_effect=LiveApiUnavailable("Cloudflare challenge"))
     def test_stale_manual_fallback_json_is_ignored(self, _get_json, read_cache):
         get_active_exclusive_events.clear()
         stale_payload = {
-            "last_updated": "31/07/2026 13:02:35 WIB",
-            "data": [{"code": "EXOLD", "valid_date_from": "2026-07-16T13:00:00.000Z", "valid_date_to": "2026-07-31T23:59:59.000Z"}],
+            "last_updated": "31/07/2025 13:02:35 WIB",
+            "data": [{"code": "EXOLD", "valid_date_from": "2025-07-16T13:00:00.000Z", "valid_date_to": "2025-07-31T23:59:59.000Z"}],
         }
         read_cache.side_effect = [None, stale_payload]
 
         events = get_active_exclusive_events()
 
-        self.assertEqual(events, [])
+        self.assertTrue(events)
         self.assertNotIn("EXOLD", [event.get("code") for event in events])
+        self.assertIn("EXE588", [event.get("code") for event in events])
 
     @patch("core.api._read_cache")
     @patch("core.api._get_json", side_effect=LiveApiUnavailable("Cloudflare challenge"))
@@ -201,7 +203,25 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
 
         self.assertEqual([event["code"] for event in events], ["EXFUTURE"])
 
-    @patch("builtins.open", side_effect=PermissionError)
+    @patch("core.api._read_cache")
+    @patch("core.api._get_json", side_effect=LiveApiUnavailable("Cloudflare challenge"))
+    def test_fallback_keeps_multiple_valid_events_when_live_api_is_down(self, _get_json, read_cache):
+        get_active_exclusive_events.clear()
+        payload = {
+            "last_updated": "18/09/2026 12:13:38 WIB",
+            "data": [
+                {"code": "EX01", "valid_date_from": "2026-06-15T05:00:00.000Z", "valid_date_to": "2026-10-01T23:59:59.000Z"},
+                {"code": "EX02", "valid_date_from": "2026-07-16T13:00:00.000Z", "valid_date_to": "2026-11-01T23:59:59.000Z"},
+                {"code": "EX03", "valid_date_from": "2026-08-20T13:00:00.000Z", "valid_date_to": "2026-12-01T23:59:59.000Z"},
+            ],
+        }
+        read_cache.side_effect = [None, payload]
+
+        events = get_active_exclusive_events()
+
+        self.assertEqual([event["code"] for event in events], ["EX01", "EX02", "EX03"])
+
+    @patch("core.api.os.replace", side_effect=PermissionError)
     @patch("core.api._get_json")
     def test_cache_write_failure_does_not_discard_live_detail(self, get_json, _open):
         live_detail = {"code": "EXNEW1", "session": []}
@@ -226,8 +246,9 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
         self.assertEqual(set_status.call_count, 20)
 
     @patch("core.api._write_cache")
+    @patch("core.api._read_latest_cache", return_value=None)
     @patch("core.api._get_json")
-    def test_bonus_stock_overrides_matching_slots_and_falls_back(self, get_json, write_cache):
+    def test_bonus_stock_overrides_matching_slots_and_falls_back(self, get_json, _read_cache, write_cache):
         member = {"label": "Jalur 1", "jkt48_member_name": "Jacqueline Immanuela",
                   "tickets_sold": 10, "available_quota": 35, "quota_available": True}
         session = {"date": "2026-09-13", "start_time": "11:45:00", "label": "Sesi 1",

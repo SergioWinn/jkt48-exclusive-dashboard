@@ -165,6 +165,7 @@ def _render_dashboard(
                         "Refresh", icon=":material/refresh:", type="tertiary",
                         help="Refresh data sekarang", key="manual_refresh",
                     ):
+                        print(f"[sync] event={event_code} manual refresh requested", flush=True)
                         get_member_database.clear()
                         get_active_exclusive_events.clear()
                         clear_exclusive_detail_cache()

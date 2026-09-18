@@ -433,8 +433,19 @@ def _apply_bonus_stock(data, bonus_sessions):
     return {**data, "session": list(sessions.values())}
 
 
+def _sync_error_label(error):
+    message = str(error)
+    for label in ("Cloudflare challenge", "Cloudflare Waiting Room", "Connection failed"):
+        if message.startswith(label):
+            return label
+    if message.startswith("HTTP ") and message[5:].isdigit():
+        return message
+    return "Invalid API response"
+
+
 @st.cache_data(ttl=4, show_spinner=False)
 def _fetch_exclusive_detail_shared(code):
+    print(f"[sync] event={code} fetching detail and bonus", flush=True)
     url = f"https://jkt48.com/api/v1/exclusives/{code}?lang=id"
     cache_file = os.path.join(RUNTIME_CACHE_DIR, f"exclusive_{code}.json")
     bundled_cache_file = os.path.join("data", "fallback", f"{code}.json")
@@ -443,7 +454,9 @@ def _fetch_exclusive_detail_shared(code):
     is_live, reason, time_label = True, "", waktu_sekarang
     try:
         data = _validate_detail(_get_json(url, 12).get("data"), code)
+        print(f"[sync] event={code} detail=OK", flush=True)
     except LiveApiUnavailable as error:
+        print(f"[sync] event={code} detail=FAILED reason={_sync_error_label(error)}", flush=True)
         is_live, reason = False, str(error)
         cache_payload = _read_latest_cache(cache_file, bundled_cache_file)
         if cache_payload and cache_payload.get("data"):
@@ -459,8 +472,10 @@ def _fetch_exclusive_detail_shared(code):
     try:
         bonus = _get_json(f"https://jkt48.com/api/v1/exclusives/{code}/bonus?lang=id", 12)
         data = _apply_bonus_stock(data or {"code": code}, bonus.get("data"))
+        print(f"[sync] event={code} bonus=OK", flush=True)
         is_live, reason, time_label = True, "", waktu_sekarang
     except LiveApiUnavailable as error:
+        print(f"[sync] event={code} bonus=FAILED reason={_sync_error_label(error)}", flush=True)
         reason = f"{reason}; bonus: {error}" if reason else f"Bonus: {error}"
         if is_live:
             cached = _read_latest_cache(cache_file, bundled_cache_file)
@@ -480,6 +495,11 @@ def _fetch_exclusive_detail_shared(code):
 
 def fetch_exclusive_detail(code):
     result = _fetch_exclusive_detail_shared(code)
+    source = "LIVE" if result["is_live"] else "CACHED"
+    if not result["data"]:
+        source = "UNAVAILABLE"
+    outcome = "SUCCESSFUL" if result["is_live"] and not result["reason"] else "FAILED"
+    print(f"[sync] event={code} result={outcome} source={source} snapshot={result['time']}", flush=True)
     _set_wr_status(
         code,
         result["is_live"],

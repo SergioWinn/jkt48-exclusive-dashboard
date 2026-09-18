@@ -17,7 +17,8 @@ class DashboardNoticesTest(unittest.TestCase):
              patch("core.api.get_member_database", return_value=({}, {})), \
              patch("core.api._read_latest_cache", return_value={"data": event, "last_updated": "last good"}), \
              patch("core.api._write_cache"), \
-             patch("core.api._get_json", side_effect=LiveApiUnavailable("Cloudflare challenge")) as get_json:
+             patch("core.api._get_json", side_effect=LiveApiUnavailable("Cloudflare challenge")) as get_json, \
+             patch("builtins.print") as log:
             clear_exclusive_detail_cache()
             app = AppTest.from_file(str(Path(__file__).parents[1] / "app.py"))
             app.secrets["ADMIN_KEYS"] = ["test-key"]
@@ -37,6 +38,11 @@ class DashboardNoticesTest(unittest.TestCase):
             self.assertEqual(app.session_state["event_data_EXRECOVER"], event)
             self.assertFalse(app.session_state["wr_status_EXRECOVER"]["is_live"])
             self.assertTrue(any("CACHED DATA" in m.value for m in app.markdown))
+            lines = "\n".join(str(call.args[0]) for call in log.call_args_list)
+            self.assertIn("manual refresh requested", lines)
+            self.assertIn("detail=FAILED reason=Cloudflare challenge", lines)
+            self.assertIn("bonus=FAILED reason=Cloudflare challenge", lines)
+            self.assertIn("result=FAILED source=CACHED snapshot=last good", lines)
             get_json.side_effect = [{"status": True, "data": event}, {"status": True, "data": [{
                 "date": "2000-01-01", "start_time": "11:00", "session_members": [{
                     "label": "1", "member_name": "Member", "available_quota": 2,
@@ -47,6 +53,10 @@ class DashboardNoticesTest(unittest.TestCase):
             self.assertTrue(app.session_state["wr_status_EXRECOVER"]["is_live"])
             self.assertEqual(len(app.success), 0)
             self.assertTrue(any(c.value == ":green[Successful]" for c in app.caption))
+            lines = "\n".join(str(call.args[0]) for call in log.call_args_list)
+            self.assertIn("detail=OK", lines)
+            self.assertIn("bonus=OK", lines)
+            self.assertIn("result=SUCCESSFUL source=LIVE", lines)
             self.assertEqual(app.session_state["event_data_EXRECOVER"]["session"][0]["session_detail"][0]["available_quota"], 2)
             clear_exclusive_detail_cache()
 

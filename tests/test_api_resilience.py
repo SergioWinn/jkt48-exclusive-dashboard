@@ -8,6 +8,29 @@ from core import api
 
 
 class ApiResilienceTest(unittest.TestCase):
+    @patch("core.api.USING_BROWSER_CLIENT", True)
+    @patch("core.api._get_http_session")
+    def test_chrome_challenge_falls_back_to_safari(self, get_session):
+        challenge = Mock(status_code=403, headers={"content-type": "text/html"})
+        live = Mock(status_code=200, headers={"content-type": "application/json"})
+        get_session.return_value.get.side_effect = [challenge, live]
+        self.assertIs(api._send_http_get("https://jkt48.com/api/v1/members", 12, api.FALLBACK_HEADERS), live)
+        self.assertEqual([c.args[0] for c in get_session.call_args_list], ["chrome136", "safari184"])
+
+    @patch("core.api._set_wr_status")
+    @patch("core.api._write_cache")
+    @patch("core.api._read_latest_cache")
+    @patch("core.api._get_json")
+    def test_live_main_data_survives_bonus_failure(self, get_json, cache, write, status):
+        api.clear_exclusive_detail_cache()
+        live = {"code": "EXPARTIAL", "title": "New title", "session": []}
+        cache.return_value = {"data": {**live, "title": "Old title"}, "last_updated": "old"}
+        get_json.side_effect = [{"data": live}, api.LiveApiUnavailable("Cloudflare challenge")]
+        self.assertEqual(api.fetch_exclusive_detail("EXPARTIAL"), live)
+        self.assertTrue(status.call_args.args[1])
+        self.assertIn("Bonus:", status.call_args.args[3])
+        write.assert_not_called()
+
     def tearDown(self):
         api.get_active_exclusive_events.clear()
         api.clear_exclusive_detail_cache()
@@ -41,8 +64,7 @@ class ApiResilienceTest(unittest.TestCase):
         }]}
         cache.return_value = {"last_updated": "last good", "data": saved}
         for detail in (api.LiveApiUnavailable("timeout"), {"session": None},
-                       {"session": [None]}, {"session": [{"session_detail": [None]}]},
-                       {"session": []}):
+                       {"session": [None]}, {"session": [{"session_detail": [None]}]}):
             api.clear_exclusive_detail_cache()
             response = detail if isinstance(detail, Exception) else {"status": True, "data": {"code": "EXSAFE", **detail}}
             get_json.side_effect = [response, api.LiveApiUnavailable("Cloudflare challenge")]
@@ -62,19 +84,20 @@ class ApiResilienceTest(unittest.TestCase):
 
     @patch("core.api.USING_BROWSER_CLIENT", True)
     @patch("core.api._get_http_session")
-    def test_timeout_does_not_multiply_browser_attempts(self, get_session):
+    def test_timeout_is_limited_to_two_browser_attempts(self, get_session):
         get = get_session.return_value.get
         get.side_effect = TimeoutError
         with self.assertRaises(api.LiveApiUnavailable):
             api._get_json("https://jkt48.com/api/v1/members", 20)
-        get.assert_called_once()
+        self.assertEqual(get.call_count, 2)
         self.assertEqual(get.call_args.kwargs["timeout"], 5)
-        self.assertEqual(get_session.return_value.cookies.clear.call_count, 2)
+        self.assertEqual(get_session.return_value.cookies.clear.call_count, 4)
 
     @patch("core.api.USING_BROWSER_CLIENT", True)
     @patch("core.api._http_clients", new_callable=local)
     @patch("core.api.browser_requests.Session")
     def test_session_reuses_connections_without_retaining_cookies(self, factory, _clients):
+        factory.return_value.get.return_value = Mock(status_code=200, headers={"content-type": "application/json"})
         for _ in range(2):
             api._send_http_get("https://jkt48.com/api/v1/members", 12, api.FALLBACK_HEADERS)
         factory.assert_called_once_with()

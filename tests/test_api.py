@@ -267,6 +267,7 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
                          {"status": True, "data": [bonus, {"session_members": [None]}]}):
             with self.subTest(response=response):
                 clear_exclusive_detail_cache()
+                write_cache.reset_mock()
                 get_json.side_effect = [{"status": True, "data": original}, response]
                 detail = fetch_exclusive_detail("EX5A08")
                 self.assertEqual(get_json.call_args.args[0], "https://jkt48.com/api/v1/exclusives/EX5A08/bonus?lang=id")
@@ -278,9 +279,10 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
                     self.assertEqual(detail["session"][1], original["session"][1])
                     self.assertEqual(detail["default_price"], 120000)
                     self.assertEqual(member["available_quota"], 35)
+                    self.assertEqual(write_cache.call_args.args[1]["data"], detail)
                 else:
                     self.assertEqual(detail, original)
-                self.assertEqual(write_cache.call_args.args[1]["data"], detail)
+                    write_cache.assert_not_called()
 
     @patch("core.api._set_wr_status")
     @patch("core.api._write_cache")

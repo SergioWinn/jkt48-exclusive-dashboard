@@ -175,6 +175,8 @@ def _render_dashboard(
                     if manual_refresh:
                         succeeded = has_event_detail and wr_info.get("is_live") and not wr_info.get("reason")
                         result = ":green[Successful]" if succeeded else ":orange[Failed]"
+                        if has_event_detail and wr_info.get("is_live") and wr_info.get("reason"):
+                            result = ":orange[Partial]"
                     st.caption(result, width="content")
             st.markdown(
                 f'<div class="source-readout {source_class}">'

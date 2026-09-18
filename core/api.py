@@ -167,25 +167,41 @@ def _set_wr_status(code, is_live, time_label, reason=""):
         pass
 
 
-def _get_http_session():
-    if not hasattr(_http_clients, "session"):
-        _http_clients.session = browser_requests.Session()
-    return _http_clients.session
+def _get_http_session(browser=None):
+    if not hasattr(_http_clients, "sessions"):
+        _http_clients.sessions = {}
+    if browser not in _http_clients.sessions:
+        _http_clients.sessions[browser] = browser_requests.Session()
+    return _http_clients.sessions[browser]
 
 
 def _send_http_get(url, timeout, headers):
-    session = _get_http_session()
     kwargs = {"timeout": min(timeout, 5), "headers": headers}
     if USING_BROWSER_CLIENT:
         # Let the selected browser profile supply its matching User-Agent.
         kwargs["headers"] = {key: value for key, value in headers.items() if key.lower() != "user-agent"}
-        kwargs.update(impersonate="chrome136", discard_cookies=True)
+        kwargs.update(discard_cookies=True)
     # Reuse connections, not cookies from a previous user or validation request.
-    session.cookies.clear()
-    try:
-        return session.get(url, **kwargs)
-    finally:
+    response = None
+    last_error = None
+    for browser in (("chrome136", "safari184") if USING_BROWSER_CLIENT else (None,)):
+        session = _get_http_session(browser)
+        if browser:
+            kwargs["impersonate"] = browser
         session.cookies.clear()
+        try:
+            response = session.get(url, **kwargs)
+            print(f"[http] profile={browser or 'requests'} status={response.status_code}", flush=True)
+            if response.status_code == 200 and "json" in response.headers.get("content-type", "").lower():
+                return response
+        except Exception as error:
+            last_error = error
+            print(f"[http] profile={browser or 'requests'} connection=FAILED", flush=True)
+        finally:
+            session.cookies.clear()
+    if response is not None:
+        return response
+    raise last_error or RuntimeError("No HTTP response")
 
 
 def _is_waiting_room_response(response):
@@ -493,18 +509,7 @@ def _fetch_exclusive_detail_shared(code):
     except LiveApiUnavailable as error:
         print(f"[sync] event={code} bonus=FAILED reason={_sync_error_label(error)}", flush=True)
         reason = f"{reason}; bonus: {error}" if reason else f"Bonus: {error}"
-        if is_live:
-            cached = _read_latest_cache(cache_file, bundled_cache_file)
-            if cached and cached.get("data"):
-                try:
-                    cached_data = _validate_detail(cached["data"], code)
-                except LiveApiUnavailable:
-                    cached_data = None
-                if cached_data:
-                    data = cached_data
-                    is_live = False
-                    time_label = cached.get("last_updated", "Unknown")
-    if is_live:
+    if is_live and not reason:
         _write_cache(cache_file, {"last_updated": time_label, "data": data})
     return {"data": data, "is_live": is_live, "reason": reason, "time": time_label}
 
@@ -514,7 +519,7 @@ def fetch_exclusive_detail(code):
     source = "LIVE" if result["is_live"] else "CACHED"
     if not result["data"]:
         source = "UNAVAILABLE"
-    outcome = "SUCCESSFUL" if result["is_live"] and not result["reason"] else "FAILED"
+    outcome = ("PARTIAL" if result["reason"] else "SUCCESSFUL") if result["is_live"] else "FAILED"
     print(f"[sync] event={code} result={outcome} source={source} snapshot={result['time']}", flush=True)
     _set_wr_status(
         code,

@@ -824,21 +824,6 @@ div[class*="st-key-filter_date_"] [role="radiogroup"] label {
     .index-footer a:hover { text-decoration: underline; }
 }
 
-/* Scroll rhythm: the live dashboard remains immediately usable if JS is unavailable. */
-.ex48-scroll-ready .ex48-reveal {
-    opacity: 0;
-    transform: translateY(12px);
-    transition:
-        opacity 420ms cubic-bezier(0.16, 1, 0.3, 1) var(--ex48-delay, 0ms),
-        transform 420ms cubic-bezier(0.16, 1, 0.3, 1) var(--ex48-delay, 0ms);
-}
-
-.ex48-scroll-ready .ex48-reveal.is-inview,
-.ex48-scroll-ready .ex48-reveal:focus-within {
-    opacity: 1;
-    transform: translateY(0);
-}
-
 .ldp-card.purchase-card:active,
 .tako-btn:active {
     transform: translateY(1px);
@@ -862,10 +847,6 @@ div[class*="st-key-filter_date_"] [role="radiogroup"] label {
         animation-duration: 0.01ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
-    }
-    .ex48-scroll-ready .ex48-reveal {
-        opacity: 1;
-        transform: none;
     }
 }
 </style>

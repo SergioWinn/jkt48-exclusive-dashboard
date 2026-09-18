@@ -6,10 +6,24 @@ from unittest.mock import patch
 
 from core.api import _apply_bonus_stock
 from core.stats import calculate_event_stats
-from ui.components import render_event_cards, render_share_controls
+from ui.components import install_motion_observer, render_event_cards, render_share_controls
+from ui.styles import GLOBAL_CSS
 
 
 class EventCardsTest(unittest.TestCase):
+    @patch("ui.components.st.iframe")
+    def test_cards_are_not_hidden_until_scrolled_into_view(self, iframe):
+        install_motion_observer()
+        script = iframe.call_args.args[0]
+        self.assertNotIn("IntersectionObserver", script)
+        self.assertNotIn('classList.add("ex48-reveal")', script)
+        self.assertNotIn(".ex48-reveal", GLOBAL_CSS)
+        self.assertIn("values.get(key) !== value", script)
+        render_share_controls("test")
+        capture = iframe.call_args.args[0]
+        self.assertIn('image.loading = "eager"', capture)
+        self.assertIn("await waitForCaptureAssets(state.target)", capture)
+
     @unittest.skipUnless(shutil.which("node"), "Node is needed to check share JavaScript")
     @patch("ui.components.st.iframe")
     def test_share_snapshot_survives_live_cards_disappearing(self, iframe):

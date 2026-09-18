@@ -1,7 +1,6 @@
 import tempfile
 import unittest
 from pathlib import Path
-from threading import local
 from unittest.mock import Mock, patch
 
 from core import api
@@ -9,13 +8,13 @@ from core import api
 
 class ApiResilienceTest(unittest.TestCase):
     @patch("core.api.USING_BROWSER_CLIENT", True)
-    @patch("core.api._get_http_session")
-    def test_chrome_challenge_falls_back_to_safari(self, get_session):
+    @patch("core.api.browser_requests.get")
+    def test_chrome_challenge_falls_back_to_safari(self, get):
         challenge = Mock(status_code=403, headers={"content-type": "text/html"})
         live = Mock(status_code=200, headers={"content-type": "application/json"})
-        get_session.return_value.get.side_effect = [challenge, live]
+        get.side_effect = [challenge, live]
         self.assertIs(api._send_http_get("https://jkt48.com/api/v1/members", 12, api.FALLBACK_HEADERS), live)
-        self.assertEqual([c.args[0] for c in get_session.call_args_list], ["chrome136", "safari184"])
+        self.assertEqual([c.kwargs["impersonate"] for c in get.call_args_list], ["chrome136", "safari184"])
 
     @patch("core.api._set_wr_status")
     @patch("core.api._write_cache")
@@ -83,31 +82,21 @@ class ApiResilienceTest(unittest.TestCase):
         write.assert_called_once()
 
     @patch("core.api.USING_BROWSER_CLIENT", True)
-    @patch("core.api._get_http_session")
-    def test_timeout_is_limited_to_two_browser_attempts(self, get_session):
-        get = get_session.return_value.get
+    @patch("core.api.browser_requests.get")
+    def test_timeout_is_limited_to_two_browser_attempts(self, get):
         get.side_effect = TimeoutError
         with self.assertRaises(api.LiveApiUnavailable):
             api._get_json("https://jkt48.com/api/v1/members", 20)
         self.assertEqual(get.call_count, 2)
-        self.assertEqual(get.call_args.kwargs["timeout"], 5)
-        self.assertEqual(get_session.return_value.cookies.clear.call_count, 4)
+        self.assertEqual(get.call_args.kwargs["timeout"], 20)
 
     @patch("core.api.USING_BROWSER_CLIENT", True)
-    @patch("core.api._http_clients", new_callable=local)
-    @patch("core.api.browser_requests.Session")
-    def test_session_reuses_connections_without_retaining_cookies(self, factory, _clients):
-        factory.return_value.get.return_value = Mock(status_code=200, headers={"content-type": "application/json"})
-        for _ in range(2):
-            api._send_http_get("https://jkt48.com/api/v1/members", 12, api.FALLBACK_HEADERS)
-        factory.assert_called_once_with()
-        self.assertEqual(factory.return_value.get.call_count, 2)
-        self.assertEqual(factory.return_value.cookies.clear.call_count, 4)
-        options = factory.return_value.get.call_args.kwargs
-        self.assertEqual(options["impersonate"], "chrome136")
-        self.assertTrue(options["discard_cookies"])
-        self.assertNotIn("User-Agent", options["headers"])
-        self.assertIn("User-Agent", api.FALLBACK_HEADERS)
+    @patch("core.api.browser_requests.get")
+    def test_successful_chrome_keeps_original_headers_and_timeout(self, get):
+        get.return_value = Mock(status_code=200, headers={"content-type": "application/json"})
+        url = "https://jkt48.com/api/v1/members"
+        api._send_http_get(url, 12, api.FALLBACK_HEADERS)
+        get.assert_called_once_with(url, impersonate="chrome136", timeout=12, headers=api.FALLBACK_HEADERS)
 
     @patch("core.api._http_get", return_value=Mock(status_code=403, headers={"content-type": "text/html"}, text="Forbidden"))
     def test_plain_403_is_not_a_cloudflare_challenge(self, _get):

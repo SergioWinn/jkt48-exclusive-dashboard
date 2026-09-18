@@ -3,7 +3,6 @@
 import json
 import os
 import tempfile
-from threading import local
 from datetime import datetime, timedelta, timezone
 
 import streamlit as st
@@ -26,7 +25,6 @@ FALLBACK_HEADERS = {
 RUNTIME_CACHE_DIR = ".runtime_cache"
 _runtime_jkt48_cookie = None
 _waiting_room_detected = False
-_http_clients = local()
 WAITING_ROOM_COOKIE_NAME = "__cfwaitingroom_q7VnL4xM2pK8dR5sT1wY9cB6hJ3uF0zA7eG2mN5Q8"
 MAX_FALLBACK_AGE_DAYS = 365
 AKB48_PHOTO_MAP = {
@@ -167,41 +165,25 @@ def _set_wr_status(code, is_live, time_label, reason=""):
         pass
 
 
-def _get_http_session(browser=None):
-    if not hasattr(_http_clients, "sessions"):
-        _http_clients.sessions = {}
-    if browser not in _http_clients.sessions:
-        _http_clients.sessions[browser] = browser_requests.Session()
-    return _http_clients.sessions[browser]
-
-
 def _send_http_get(url, timeout, headers):
-    kwargs = {"timeout": min(timeout, 5), "headers": headers}
+    kwargs = {"timeout": timeout, "headers": headers}
     if USING_BROWSER_CLIENT:
-        # Let the selected browser profile supply its matching User-Agent.
-        kwargs["headers"] = {key: value for key, value in headers.items() if key.lower() != "user-agent"}
-        kwargs.update(discard_cookies=True)
-    # Reuse connections, not cookies from a previous user or validation request.
-    response = None
-    last_error = None
-    for browser in (("chrome136", "safari184") if USING_BROWSER_CLIENT else (None,)):
-        session = _get_http_session(browser)
-        if browser:
-            kwargs["impersonate"] = browser
-        session.cookies.clear()
-        try:
-            response = session.get(url, **kwargs)
-            print(f"[http] profile={browser or 'requests'} status={response.status_code}", flush=True)
-            if response.status_code == 200 and "json" in response.headers.get("content-type", "").lower():
+        responses = []
+        last_error = None
+        for browser in ("chrome136", "safari184"):
+            try:
+                response = browser_requests.get(url, impersonate=browser, **kwargs)
+            except Exception as error:
+                last_error = error
+                continue
+            responses.append(response)
+            content_type = response.headers.get("content-type", "").lower()
+            if response.status_code == 200 and "json" in content_type:
                 return response
-        except Exception as error:
-            last_error = error
-            print(f"[http] profile={browser or 'requests'} connection=FAILED", flush=True)
-        finally:
-            session.cookies.clear()
-    if response is not None:
-        return response
-    raise last_error or RuntimeError("No HTTP response")
+        if responses:
+            return responses[-1]
+        raise last_error or RuntimeError("No HTTP response")
+    return browser_requests.get(url, **kwargs)
 
 
 def _is_waiting_room_response(response):

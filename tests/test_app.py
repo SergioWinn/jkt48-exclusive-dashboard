@@ -114,11 +114,7 @@ class DashboardNoticesTest(unittest.TestCase):
                     self.assertEqual(app.session_state["event_data_EXTEST"], event)
                     continue
                 self.assertEqual(len(messages), 1)
-                if reason.startswith("bonus:"):
-                    self.assertEqual(messages[0].value.count("Menampilkan data API utama"), 1)
-                else:
-                    self.assertIn("cloudflare", messages[0].value.lower())
-                self.assertIn("menampilkan data", messages[0].value.lower())
+                self.assertEqual(messages[0].value, "Bonus belum tersedia.")
                 self.assertNotIn("Jumlah terjual tidak tersedia", messages[0].value)
                 self.assertEqual(app.button(key="manual_refresh").label, "Refresh")
                 self.assertFalse(any(button.label == "Mitigate Waiting Room" for button in app.button))

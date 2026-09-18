@@ -1,12 +1,72 @@
 import unittest
+import re
+import shutil
+import subprocess
 from unittest.mock import patch
 
 from core.api import _apply_bonus_stock
 from core.stats import calculate_event_stats
-from ui.components import render_event_cards
+from ui.components import render_event_cards, render_share_controls
 
 
 class EventCardsTest(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("node"), "Node is needed to check share JavaScript")
+    @patch("ui.components.st.iframe")
+    def test_share_snapshot_survives_live_cards_disappearing(self, iframe):
+        render_share_controls("test")
+        html = iframe.call_args.args[0]
+        functions = "\n".join(re.search(
+            rf"        function {name}\([^)]*\).*?\n        }}", html, re.S
+        ).group(0) for name in ("openPicker", "refreshData", "selectedCardCount", "buildShareParts"))
+        script = r'''
+const assert = require('node:assert/strict');
+let shareSnapshot = null, selectionInitialized = false;
+let shareParts = [], activePart = -1;
+let selectedSessions = new Set(), selectedMembers = new Set(), sessionItems = [], memberItems = [];
+const card = {dataset: {shareSession: 'one', shareSessionLabel: 'Session 1', shareMember: 'Member'}, stock: 7};
+let liveCards = [card];
+const source = {cloneNode() {
+    const cards = structuredClone(liveCards);
+    return {querySelectorAll: () => cards};
+}};
+let liveSource = source;
+const window = {parent: {document: {getElementById: () => liveSource}}};
+const dialog = {open: false, showModal() {this.open = true;}, querySelector() {return null;}};
+const requestAnimationFrame = callback => callback();
+const normalizeCaptureColors = () => ({background: 'black', tokens: {}});
+const getCaptureBackground = () => 'black';
+const setFeedback = () => {};
+const renderPicker = () => {};
+const loadSaved = (_, available) => new Set(available);
+''' + functions + r'''
+openPicker();
+assert.equal(selectedCardCount(), 1);
+card.stock = 0;
+liveCards = [];
+liveSource = null;
+refreshData();
+assert.equal(selectedCardCount(), 1);
+assert.equal(shareSnapshot.source.querySelectorAll()[0].stock, 7);
+assert.deepEqual(sessionItems, [{value: 'one', label: 'Session 1'}]);
+dialog.open = false;
+liveSource = source;
+liveCards = [{...card, stock: 2}];
+openPicker();
+assert.equal(shareSnapshot.source.querySelectorAll()[0].stock, 2);
+for (const [count, sizes] of [[4, [4]], [5, [3, 2]], [6, [3, 3]], [7, [4, 3]], [8, [4, 4]], [9, [3, 3, 3]], [10, [4, 3, 3]]]) {
+    const items = Array.from({length: count}, (_, i) => ({value: String(i), label: `18/09/2026 - Session ${i + 1}`}));
+    const parts = buildShareParts(items);
+    assert.deepEqual(parts.map(p => p.values.length), sizes);
+    assert.deepEqual(parts.flatMap(p => p.values), items.map(i => i.value));
+}
+const days = buildShareParts([{value: 'a', label: '18/09/2026 - Session 1'}, {value: 'b', label: '19/09/2026 - Session 1'}]);
+assert.deepEqual(days.map(p => p.values), [['a'], ['b']]);
+'''
+        subprocess.run([shutil.which("node"), "-e", script], check=True, capture_output=True, text=True)
+        capture = html.split("function siapkanTarget()", 1)[1].split("function setCopyState", 1)[0]
+        self.assertIn("const source = shareSnapshot?.source", capture)
+        self.assertNotIn('getElementById("laporan-container")', capture)
+
     @patch("ui.components.st.markdown")
     def test_bonus_remaining_is_shown_without_sales_counts(self, markdown):
         session = {"date": "2099-09-13", "start_time": "11:45:00", "label": "Sesi 1"}

@@ -29,22 +29,6 @@ CATEGORY_LABELS = {
 }
 
 
-def _humanize_api_reason(reason):
-    raw_reason = (reason or "").strip()
-    normalized = raw_reason.lower()
-    if "waiting room" in normalized or "__cfwaitingroom" in normalized:
-        return "Situs JKT48 sedang dalam antrean keamanan Cloudflare (Waiting Room). Kami menampilkan data terakhir yang tersedia sementara proses verifikasi berjalan."
-    if "cloudflare challenge" in normalized or "just a moment" in normalized or "cf-chl" in normalized:
-        return "Situs JKT48 sedang menjalani verifikasi keamanan Cloudflare. Data terbaru mungkin tertunda sementara sistem memvalidasi akses."
-    if "connection failed" in normalized:
-        return "Koneksi ke server JKT48 terganggu. Kami menampilkan data terakhir yang berhasil disimpan."
-    if "bonus:" in normalized:
-        return "Sisa stok bonus belum bisa dimuat. Menampilkan data API utama yang tersedia."
-    if raw_reason:
-        return raw_reason
-    return "Layanan JKT48 sedang tidak dapat diakses saat ini."
-
-
 ASSETS_DIR = Path(__file__).parent / "assets"
 
 # --- 1. PAGE CONFIGURATION ---
@@ -204,20 +188,10 @@ def _render_dashboard(
     st.session_state[f"sales_stats_available_{event_code}"] = sales_data_available
     notices = []
 
-    friendly_reason = _humanize_api_reason(wr_info.get("reason"))
-
-    if not has_event_detail and not wr_info.get("is_live") and not event_closed:
-        notices.append(
-            f"{friendly_reason} "
-            "Belum ada data sesi yang tersimpan untuk event ini."
-        )
-    elif not has_event_detail and not event_closed:
-        notices.append(
-            "Detail sesi dan stok belum tersedia. Kami menampilkan daftar event saja sementara proses sinkronisasi berjalan."
-        )
-
-    if not event_closed and wr_info.get("is_live") and wr_info.get("reason"):
-        notices.append(friendly_reason)
+    if not has_event_detail and not event_closed:
+        notices.append("Data belum tersedia. Mencoba kembali.")
+    elif not event_closed and wr_info.get("is_live") and wr_info.get("reason"):
+        notices.append("Bonus belum tersedia.")
 
     if notices:
         show_notice = st.warning if not wr_info.get("is_live") or not has_event_detail else st.info

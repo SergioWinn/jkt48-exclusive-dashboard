@@ -1107,6 +1107,30 @@ def render_share_controls(storage_key, right_px=84):
         let resetTimer = null;
         let selectionInitialized = false;
         let activeCaptureWrapper = null;
+        let shareSnapshot = null;
+        let shareParts = [];
+        let activePart = -1;
+
+        function buildShareParts(items) {
+            const days = new Map();
+            items.forEach(item => {
+                const day = item.label.split(" - ")[0];
+                if (!days.has(day)) days.set(day, []);
+                days.get(day).push(item);
+            });
+            const parts = [];
+            days.forEach((sessions, day) => {
+                const count = Math.ceil(sessions.length / 4);
+                let offset = 0;
+                for (let index = 0; index < count; index++) {
+                    const size = Math.floor(sessions.length / count) + (index < sessions.length % count ? 1 : 0);
+                    parts.push({label: `${day} · Part ${index + 1}/${count} (${size} sessions)`,
+                                values: sessions.slice(offset, offset + size).map(item => item.value)});
+                    offset += size;
+                }
+            });
+            return parts;
+        }
 
         try {
             const iframe = window.frameElement;
@@ -1137,7 +1161,7 @@ def render_share_controls(storage_key, right_px=84):
         }
 
         function refreshData() {
-            const cards = [...window.parent.document.querySelectorAll("#laporan-container .ldp-card[data-share-session]")];
+            const cards = [...(shareSnapshot?.source.querySelectorAll(".ldp-card[data-share-session]") || [])];
             const sessions = new Map();
             const members = new Set();
             cards.forEach(card => {
@@ -1160,9 +1184,14 @@ def render_share_controls(storage_key, right_px=84):
 
         const oldDialog = window.parent.document.getElementById("share-selection-dialog");
         const reopenDialog = Boolean(oldDialog && oldDialog.open);
+        if (reopenDialog && oldDialog.dataset.storageKey === storageKey) {
+            shareSnapshot = oldDialog.shareSnapshot;
+        }
         if (oldDialog) oldDialog.remove();
         const dialog = window.parent.document.createElement("dialog");
         dialog.id = "share-selection-dialog";
+        dialog.dataset.storageKey = storageKey;
+        dialog.shareSnapshot = shareSnapshot;
         dialog.setAttribute("aria-labelledby", "share-picker-title");
         dialog.setAttribute("aria-describedby", "share-picker-description");
         dialog.innerHTML = `
@@ -1221,6 +1250,8 @@ def render_share_controls(storage_key, right_px=84):
                 <section class="share-picker-section">
                     <div class="share-picker-section-head"><h3>Sessions</h3><div class="share-picker-actions"><button aria-label="Select all sessions" data-group="sessions" data-action="all">All</button><button aria-label="Clear all sessions" data-group="sessions" data-action="none">None</button></div></div>
                     <div class="share-picker-list" id="share-session-list"></div>
+                    <label for="share-part">Copy group</label>
+                    <select id="share-part" style="width:100%;min-height:44px;color:var(--dialog-ink);background:var(--dialog-bg);border:1px solid var(--dialog-rule);border-radius:8px;padding:8px"></select>
                 </section>
                 <section class="share-picker-section">
                     <div class="share-picker-section-head"><h3>Members</h3><div class="share-picker-actions"><button aria-label="Select all members" data-group="members" data-action="all">All</button><button aria-label="Clear all members" data-group="members" data-action="none">None</button></div></div>
@@ -1256,7 +1287,7 @@ def render_share_controls(storage_key, right_px=84):
         }
 
         function selectedCardCount() {
-            return [...window.parent.document.querySelectorAll("#laporan-container .ldp-card[data-share-session]")].filter(card => (
+            return [...(shareSnapshot?.source.querySelectorAll(".ldp-card[data-share-session]") || [])].filter(card => (
                 selectedSessions.has(card.dataset.shareSession) && selectedMembers.has(card.dataset.shareMember)
             )).length;
         }
@@ -1271,6 +1302,10 @@ def render_share_controls(storage_key, right_px=84):
                 checkbox.type = "checkbox";
                 checkbox.checked = selection.has(item.value);
                 checkbox.addEventListener("change", () => {
+                    if (containerId === "#share-session-list") {
+                        activePart = -1;
+                        dialog.querySelector("#share-part").value = "-1";
+                    }
                     if (checkbox.checked) selection.add(item.value); else selection.delete(item.value);
                     saveSelection();
                     setFeedback();
@@ -1284,25 +1319,66 @@ def render_share_controls(storage_key, right_px=84):
         }
 
         function renderPicker() {
+            const partPicker = dialog.querySelector("#share-part");
+            partPicker.replaceChildren();
+            [{label: "Manual selection"}, ...shareParts].forEach((part, index) => {
+                const option = window.parent.document.createElement("option");
+                option.value = String(index - 1);
+                option.textContent = part.label;
+                partPicker.appendChild(option);
+            });
+            partPicker.value = String(activePart);
             renderList("#share-session-list", sessionItems, selectedSessions);
             renderList("#share-member-list", memberItems, selectedMembers);
             updateCount();
         }
 
+        function selectPart(index) {
+            activePart = index;
+            if (index >= 0) selectedSessions = new Set(shareParts[index].values);
+            saveSelection();
+            setFeedback();
+            renderPicker();
+        }
+        dialog.querySelector("#share-part").addEventListener("change", event => selectPart(Number(event.target.value)));
+
         dialog.querySelectorAll("[data-action]").forEach(button => button.addEventListener("click", () => {
             const isSessions = button.dataset.group === "sessions";
             const items = isSessions ? sessionItems : memberItems;
             const selection = button.dataset.action === "all" ? new Set(items.map(item => item.value)) : new Set();
-            if (isSessions) selectedSessions = selection; else selectedMembers = selection;
+            if (isSessions) {
+                selectedSessions = selection;
+                activePart = -1;
+            } else selectedMembers = selection;
             saveSelection();
             setFeedback();
             renderPicker();
         }));
         dialog.querySelector(".share-picker-close").addEventListener("click", () => dialog.close());
         dialog.addEventListener("click", event => { if (event.target === dialog) dialog.close(); });
+        dialog.addEventListener("close", () => {
+            shareSnapshot = null;
+            dialog.shareSnapshot = null;
+        });
 
         function openPicker() {
+            const opening = !dialog.open;
+            if (!dialog.open) {
+                const source = window.parent.document.getElementById("laporan-container");
+                const frozen = source?.cloneNode(true);
+                shareSnapshot = frozen ? {
+                    source: frozen,
+                    theme: normalizeCaptureColors(frozen, source, getCaptureBackground(source)),
+                } : null;
+                dialog.shareSnapshot = shareSnapshot;
+                setFeedback();
+            }
             refreshData();
+            if (opening) {
+                shareParts = buildShareParts(sessionItems);
+                activePart = shareParts.length > 1 ? 0 : -1;
+                if (activePart === 0) selectedSessions = new Set(shareParts[0].values);
+            }
             renderPicker();
             if (!dialog.open) dialog.showModal();
             requestAnimationFrame(() => dialog.querySelector("input")?.focus());
@@ -1311,6 +1387,7 @@ def render_share_controls(storage_key, right_px=84):
         document.getElementById("share-btn").addEventListener("click", openPicker);
         if (reopenDialog) {
             refreshData();
+            shareParts = buildShareParts(sessionItems);
             renderPicker();
             if (!dialog.open) dialog.showModal();
         }
@@ -1419,7 +1496,7 @@ def render_share_controls(storage_key, right_px=84):
                 requestAnimationFrame(() => dialog.querySelector("input")?.focus());
                 return null;
             }
-            const source = window.parent.document.getElementById("laporan-container");
+            const source = shareSnapshot?.source;
             if (!source) return null;
 
             const target = source.cloneNode(true);
@@ -1449,7 +1526,7 @@ def render_share_controls(storage_key, right_px=84):
             const banner = target.querySelector("#share-banner");
             if (banner) banner.style.display = "flex";
 
-            const captureTheme = normalizeCaptureColors(target, source, getCaptureBackground(source));
+            const captureTheme = shareSnapshot.theme;
             const background = captureTheme.background;
             const wrapper = window.parent.document.createElement("div");
             wrapper.style.position = "fixed";
@@ -1645,7 +1722,10 @@ def render_share_controls(storage_key, right_px=84):
                 const didComplete = button.dataset.state === "success";
                 resetTimer = setTimeout(() => {
                     setCopyState(button, "idle");
-                    if (didComplete) dialog.close();
+                    if (didComplete) {
+                        if (activePart >= 0 && activePart + 1 < shareParts.length) selectPart(activePart + 1);
+                        else dialog.close();
+                    }
                 }, didComplete ? 1400 : 3000);
             }
         });

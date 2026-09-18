@@ -25,6 +25,53 @@ RUNTIME_CACHE_DIR = ".runtime_cache"
 _runtime_jkt48_cookie = None
 _waiting_room_detected = False
 WAITING_ROOM_COOKIE_NAME = "__cfwaitingroom_q7VnL4xM2pK8dR5sT1wY9cB6hJ3uF0zA7eG2mN5Q8"
+AKB48_PHOTO_MAP = {
+    "saho iwatate": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100622.jpg",
+    "seina fukuoka": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100790.jpg",
+    "yui oguri": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100816.jpg",
+    "yurina gyoten": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100840.jpg",
+    "narumi kuranoo": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100846.jpg",
+    "hiyuka sakagawa": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100997.jpg",
+    "miu shitao": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100838.jpg",
+    "ayane takahashi": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100814.jpg",
+    "remi tokunaga": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100993.jpg",
+    "serika nagano": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100828.jpg",
+    "haruna hashimoto": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100824.jpg",
+    "erii chiba": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100927.jpg",
+    "haruka kurosu": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100937.jpg",
+    "ayami nagatomo": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100943.jpg",
+    "orin muto": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100949.jpg",
+    "mizuki yamauchi": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83101007.jpg",
+    "suzuha yamane": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100952.jpg",
+    "yuki ota": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100998.jpg",
+    "airi sato": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83101000.jpg",
+    "eriko hashimoto": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83101001.jpg",
+    "nozomi hatakeyama": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83101003.jpg",
+    "yuki hirata": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83101004.jpg",
+    "moka hotei": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83101005.jpg",
+    "mayuu masai": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83101006.jpg",
+    "miyuu mizushima": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83101007.jpg",
+    "sora yamazaki": "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83101008.jpg",
+    "yuna akiyama": "https://d2r1lkk9i7row.cloudfront.net/hashiranokai/member/83101009.jpg",
+    "sae arai": "https://d2r1lkk9i7row.cloudfront.net/hashiranokai/member/83101010.jpg",
+    "kasumi kudo": "https://d2r1lkk9i7row.cloudfront.net/hashiranokai/member/83101011.jpg",
+    "hinano kubo": "https://d2r1lkk9i7row.cloudfront.net/hashiranokai/member/83101012.jpg",
+    "yumemi sako": "https://d2r1lkk9i7row.cloudfront.net/hashiranokai/member/83101013.jpg",
+    "kohina narita": "https://d2r1lkk9i7row.cloudfront.net/hashiranokai/member/83101014.jpg",
+    "azuki yagi": "https://d2r1lkk9i7row.cloudfront.net/hashiranokai/member/83101015.jpg",
+    "yui yamaguchi": "https://d2r1lkk9i7row.cloudfront.net/hashiranokai/member/83101016.jpg",
+    "momoka ito": "https://d2r1lkk9i7row.cloudfront.net/hashiranokai/member/83101017.jpg",
+    "kairi okumoto": "https://d2r1lkk9i7row.cloudfront.net/hashiranokai/member/83101018.jpg",
+    "yui kawamura": "https://d2r1lkk9i7row.cloudfront.net/hashiranokai/member/83101019.jpg",
+    "saki oga": "https://d2r1lkk9i7row.cloudfront.net/hashiranokai/member/83101022.jpg",
+    "saki kondo": "https://d2r1lkk9i7row.cloudfront.net/hashiranokai/member/83101023.jpg",
+    "hinata maruyama": "https://d2r1lkk9i7row.cloudfront.net/hashiranokai/member/83101024.jpg",
+    "mao takahashi": "https://d2r1lkk9i7row.cloudfront.net/hashiranokai/member/83101025.jpg",
+    "sayuri tanaka": "https://d2r1lkk9i7row.cloudfront.net/hashiranokai/member/83101026.jpg",
+    "ema makito": "https://d2r1lkk9i7row.cloudfront.net/hashiranokai/member/83101027.jpg",
+    "yu morikawa": "https://d2r1lkk9i7row.cloudfront.net/hashiranokai/member/83101028.jpg",
+    "kiko watanabe": "https://d2r1lkk9i7row.cloudfront.net/hashiranokai/member/83101029.jpg",
+}
 KNOWN_EXCLUSIVE_EVENTS = [
     {"exclusive_id": 936, "category": "PHOTOCARD", "thumbnail_image": "https://jkt48.com/api/v1/storages/media/exclusive/2026/04/ex7b6d-thumb-d71768.jpg", "preview_image": "https://jkt48.com/api/v1/storages/media/exclusive/2026/04/ex7b6d-preview-8a69c1.jpg", "code": "EXE588", "valid_date_from": "2026-04-02T11:00:00.000Z", "sort_order": 1, "title": "Personal Meet and Greet Festival: LOVE DREAM PASSION, Meet & Greet - 23 May", "short_description": ""},
     {"exclusive_id": 962, "category": "DIGITAL_PHOTOBOOK", "thumbnail_image": "https://jkt48.com/api/v1/storages/media/exclusive/2026/07/ex7f6c-thumb-a2122e.jpg", "preview_image": "https://jkt48.com/api/v1/storages/media/exclusive/2026/07/ex7f6c-preview-872f71.jpg", "code": "EX7F6C", "valid_date_from": "2026-07-16T13:00:00.000Z", "sort_order": None, "title": "JKT48 Request Hour 2026 Setlist Best 40", "short_description": ""},
@@ -252,6 +299,7 @@ def get_member_database():
                     nickname_map[nickname] = name
                 if name and photo:
                     photo_map[name] = photo
+        photo_map = {**AKB48_PHOTO_MAP, **photo_map}
         if photo_map:
             _write_cache(cache_file, {"nickname_map": nickname_map, "photo_map": photo_map})
         else:
@@ -260,7 +308,7 @@ def get_member_database():
         bundled_members = _read_cache(os.path.join("data", "fallback", "members.json")) or {}
         cached_members = _read_cache(cache_file) or {}
         nickname_map = {**bundled_members.get("nickname_map", {}), **cached_members.get("nickname_map", {})}
-        photo_map = {**bundled_members.get("photo_map", {}), **cached_members.get("photo_map", {})}
+        photo_map = {**AKB48_PHOTO_MAP, **bundled_members.get("photo_map", {}), **cached_members.get("photo_map", {})}
     return nickname_map, photo_map
 
 

@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta
 
 ACTIVE_REFRESH_SECONDS = 5
-RECOVERY_REFRESH_SECONDS = 10
-CLOSED_REFRESH_SECONDS = 60
+RECOVERY_REFRESH_SECONDS = 15
+CLOSED_REFRESH_SECONDS = 3600
 
 
 def _parse_datetime(value):
@@ -41,6 +41,9 @@ def is_event_closed(event, now_wib):
 def get_detail_refresh_interval(event, is_live, now_wib):
     if not is_live:
         return RECOVERY_REFRESH_SECONDS
+
+    if event is None:
+        return ACTIVE_REFRESH_SECONDS
 
     _, end_date = get_sales_window(event)
     if end_date and now_wib >= end_date:

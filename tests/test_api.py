@@ -130,6 +130,16 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
         self.assertEqual(nicknames["michie"], "michelle alexandra")
         self.assertEqual(photos["michelle alexandra"], "https://example.com/michie.jpg")
 
+    @patch("core.api._read_cache")
+    @patch("core.api._get_json", side_effect=LiveApiUnavailable("Cloudflare challenge"))
+    def test_akb48_member_photos_are_available_as_fallback(self, _get_json, read_cache):
+        read_cache.return_value = {"nickname_map": {}, "photo_map": {}}
+
+        _, photos = get_member_database()
+
+        self.assertEqual(photos["mizuki yamauchi"], "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83101007.jpg")
+        self.assertEqual(photos["yui oguri"], "https://d2r1lkk9i7row.cloudfront.net/mobile/member/83100816.jpg")
+
     @patch("core.api._write_cache")
     @patch("core.api._get_json")
     def test_live_response_is_used_without_manual_event_list(self, get_json, write_cache):

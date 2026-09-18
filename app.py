@@ -72,12 +72,6 @@ if isinstance(admin_keys, str):
 access_key = st.query_params.get("akses", "")
 is_admin = bool(access_key and access_key in admin_keys)
 
-if is_admin and st.button("Refresh data sekarang", icon=":material/refresh:"):
-    get_member_database.clear()
-    get_active_exclusive_events.clear()
-    clear_exclusive_detail_cache()
-    st.session_state["manual_refresh_requested"] = True
-
 def _render_dashboard(
     selected_event,
     search_query,
@@ -101,9 +95,8 @@ def _render_dashboard(
             st.rerun()
     refresh_interval = get_detail_refresh_interval(event_data, wr_info.get("is_live", True), now_wib)
     last_attempt = st.session_state.get(attempt_state_key, 0.0)
-    manual_refresh = st.session_state.pop("manual_refresh_requested", False)
 
-    should_fetch = manual_refresh or event_state_key not in st.session_state or (
+    should_fetch = event_state_key not in st.session_state or (
         not closed and time.monotonic() - last_attempt >= refresh_interval
     )
     if event_code and should_fetch:
@@ -119,16 +112,6 @@ def _render_dashboard(
     closed = is_event_closed(event_data, now_wib)
     refresh_interval = get_detail_refresh_interval(event_data, wr_info.get("is_live", True), now_wib)
     has_event_detail = isinstance(event_data.get("session"), list)
-
-    if manual_refresh:
-        if wr_info.get("is_live") and not wr_info.get("reason"):
-            st.success("Data event dan stok berhasil dimuat ulang dari API.")
-        else:
-            st.warning(
-                "Refresh sudah dicoba, tetapi data terbaru belum lengkap. "
-                f"{wr_info.get('reason') or 'API belum tersedia'}. "
-                "Data yang tersedia tetap ditampilkan."
-            )
 
     if closed:
         source_class = "is-cached"

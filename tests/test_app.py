@@ -35,7 +35,7 @@ class DashboardNoticesTest(unittest.TestCase):
                     "label": "1", "member_name": "Member", "available_quota": 2,
                 }],
             }]}]
-            next(b for b in app.button if b.label == "Refresh data sekarang").click().run(timeout=15)
+            app.button(key="manual_refresh").click().run(timeout=15)
             self.assertEqual(len(app.exception), 0)
             self.assertTrue(app.session_state["wr_status_EXRECOVER"]["is_live"])
             self.assertEqual(app.session_state["event_data_EXRECOVER"]["session"][0]["session_detail"][0]["available_quota"], 2)
@@ -65,13 +65,14 @@ class DashboardNoticesTest(unittest.TestCase):
             status = next(m.value for m in app.markdown if "FINAL SNAPSHOT" in m.value)
             self.assertTrue(all(line.strip() for line in status.splitlines()))
             self.assertEqual(len(app.warning) + len(app.info), 0)
+            self.assertFalse(any(b.key == "manual_refresh" for b in app.button))
 
-    def test_api_and_stock_notices_share_one_message(self):
+    def test_cached_status_replaces_notice_but_partial_live_data_keeps_notice(self):
         event = {"code": "EXTEST", "title": "Test event", "category": "DIGITAL_PHOTOBOOK",
                  "session": [{"date": "2099-09-13", "label": "Sesi 1", "start_time": "11:45:00",
                               "session_detail": [{"label": "Jalur 1", "jkt48_member_name": "Test Member",
                                                   "available_quota": 9}]}]}
-        for is_live, reason in ((False, "Cloudflare Waiting Room"),
+        for is_live, reason in ((False, "Cloudflare Waiting Room"), (False, "Cloudflare challenge"),
                                 (True, "Cloudflare Waiting Room"), (True, "bonus: HTTP 404")):
             with self.subTest(is_live=is_live, reason=reason), \
                  patch("core.api.get_active_exclusive_events", return_value=[event]), \
@@ -87,13 +88,20 @@ class DashboardNoticesTest(unittest.TestCase):
                 app.run(timeout=15)
                 self.assertEqual(len(app.exception), 0)
                 messages = list(app.warning) + list(app.info)
+                if not is_live:
+                    self.assertEqual(len(messages), 0)
+                    status = next(m.value for m in app.markdown if "CACHED DATA" in m.value)
+                    self.assertIn("last sync", status)
+                    self.assertEqual(app.session_state["event_data_EXTEST"], event)
+                    continue
                 self.assertEqual(len(messages), 1)
                 if reason.startswith("bonus:"):
                     self.assertEqual(messages[0].value.count("Menampilkan data API utama"), 1)
                 else:
                     self.assertIn("cloudflare", messages[0].value.lower())
                 self.assertIn("menampilkan data", messages[0].value.lower())
-                self.assertIn("Jumlah terjual tidak tersedia", messages[0].value)
+                self.assertNotIn("Jumlah terjual tidak tersedia", messages[0].value)
+                self.assertEqual(app.button(key="manual_refresh").label, "Refresh")
                 self.assertFalse(any(button.label == "Mitigate Waiting Room" for button in app.button))
 
 

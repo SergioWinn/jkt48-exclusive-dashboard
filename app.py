@@ -89,12 +89,6 @@ if isinstance(admin_keys, str):
 access_key = st.query_params.get("akses", "")
 is_admin = bool(access_key and access_key in admin_keys)
 
-if is_admin and st.button("Refresh data sekarang", icon=":material/refresh:"):
-    get_member_database.clear()
-    get_active_exclusive_events.clear()
-    clear_exclusive_detail_cache()
-    st.session_state["manual_refresh_requested"] = True
-
 def _render_dashboard(
     selected_event,
     search_query,
@@ -168,16 +162,30 @@ def _render_dashboard(
     event_category = escape(CATEGORY_LABELS.get(raw_category, raw_category.replace("_", " ")))
     event_price = int(event_data.get("default_price") or 0)
     sync_markup = f"<small>{escape(str(sync_label))}</small>" if sync_label else ""
-    st.markdown(
+    with st.container(horizontal=True, vertical_alignment="center"):
+        title_slot = st.container()
+        with st.container(horizontal=True, vertical_alignment="center", width="content", gap="small"):
+            if is_admin and st.button(
+                "Refresh", icon=":material/refresh:", type="tertiary",
+                help="Refresh data sekarang", key="manual_refresh",
+            ):
+                get_member_database.clear()
+                get_active_exclusive_events.clear()
+                clear_exclusive_detail_cache()
+                st.session_state["manual_refresh_requested"] = True
+                st.rerun()
+            st.markdown(
+                f'<div class="source-readout {source_class}">'
+                f'<strong>{source_label}</strong>'
+                f'<span>{source_detail}</span>{sync_markup}</div>',
+                unsafe_allow_html=True, width="content",
+            )
+    title_slot.markdown(
         f"""
         <section class="event-index-head">
             <div>
                 <div class="event-meta">{event_category} · IDR {event_price:,}</div>
                 <h2>{event_title}</h2>
-            </div>
-            <div class="source-readout {source_class}">
-                <strong>{source_label}</strong>
-                <span>{source_detail}</span>{sync_markup}
             </div>
         </section>
         """,
@@ -194,12 +202,7 @@ def _render_dashboard(
 
     friendly_reason = _humanize_api_reason(wr_info.get("reason"))
 
-    if has_event_detail and not wr_info.get("is_live") and not event_closed:
-        notices.append(
-            f"{friendly_reason} "
-            "Data yang ditampilkan adalah snapshot terakhir yang berhasil disimpan."
-        )
-    elif not has_event_detail and not wr_info.get("is_live") and not event_closed:
+    if not has_event_detail and not wr_info.get("is_live") and not event_closed:
         notices.append(
             f"{friendly_reason} "
             "Belum ada data sesi yang tersimpan untuk event ini."
@@ -211,8 +214,6 @@ def _render_dashboard(
 
     if not event_closed and wr_info.get("is_live") and wr_info.get("reason"):
         notices.append(friendly_reason)
-    if not event_closed and has_event_detail and not sales_data_available:
-        notices.append("Jumlah terjual tidak tersedia dari API. Kartu menampilkan sisa stok jika tersedia, atau status ketersediaan.")
 
     if notices:
         show_notice = st.warning if not wr_info.get("is_live") or not has_event_detail else st.info

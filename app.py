@@ -159,18 +159,22 @@ def _render_dashboard(
     with st.container(horizontal=True, vertical_alignment="center"):
         title_slot = st.container()
         with st.container(horizontal=True, vertical_alignment="center", width="content", gap="small"):
-            if is_admin and st.button(
-                "Refresh", icon=":material/refresh:", type="tertiary",
-                help="Refresh data sekarang", key="manual_refresh",
-            ):
-                get_member_database.clear()
-                get_active_exclusive_events.clear()
-                clear_exclusive_detail_cache()
-                st.session_state["manual_refresh_requested"] = True
-                st.rerun()
-            if is_admin and manual_refresh:
-                succeeded = has_event_detail and wr_info.get("is_live") and not wr_info.get("reason")
-                st.caption(":green[Successful]" if succeeded else ":orange[Failed]", width="content")
+            if is_admin:
+                with st.container(width="content", gap=None):
+                    if st.button(
+                        "Refresh", icon=":material/refresh:", type="tertiary",
+                        help="Refresh data sekarang", key="manual_refresh",
+                    ):
+                        get_member_database.clear()
+                        get_active_exclusive_events.clear()
+                        clear_exclusive_detail_cache()
+                        st.session_state["manual_refresh_requested"] = True
+                        st.rerun()
+                    result = "\u00a0"
+                    if manual_refresh:
+                        succeeded = has_event_detail and wr_info.get("is_live") and not wr_info.get("reason")
+                        result = ":green[Successful]" if succeeded else ":orange[Failed]"
+                    st.caption(result, width="content")
             st.markdown(
                 f'<div class="source-readout {source_class}">'
                 f'<strong>{source_label}</strong>'

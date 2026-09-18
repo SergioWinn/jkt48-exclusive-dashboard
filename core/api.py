@@ -299,8 +299,8 @@ def get_member_database():
                     nickname_map[nickname] = name
                 if name and photo:
                     photo_map[name] = photo
-        photo_map = {**AKB48_PHOTO_MAP, **photo_map}
         if photo_map:
+            photo_map = {**AKB48_PHOTO_MAP, **photo_map}
             _write_cache(cache_file, {"nickname_map": nickname_map, "photo_map": photo_map})
         else:
             raise LiveApiUnavailable("Member photos are empty")

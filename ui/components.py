@@ -262,8 +262,9 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
     </div>
     """
     
-    search_class = ' class="is-search-mode"' if is_search_mode else ''
-    master_html_buffer = f'<div id="laporan-container"{search_class}>{banner_html}'
+    layout_class = "is-search-mode" if is_search_mode else "available-only-layout" if available_only else ""
+    class_attribute = f' class="{layout_class}"' if layout_class else ""
+    master_html_buffer = f'<div id="laporan-container"{class_attribute}>{banner_html}'
     
     if is_search_mode:
         master_html_buffer += '<div class="cards-grid">'
@@ -286,6 +287,9 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
         display_time_info = escape(time_info)
         
         if not is_search_mode:
+            original_member_count = len(sesi.get('session_detail', []))
+            compact_class = " is-compact" if available_only and len(members) * 2 < original_member_count else ""
+            master_html_buffer += f'<section class="session-group{compact_class}">'
             master_html_buffer += f'<h3 class="session-heading" data-share-session-heading="{session_share_key}">{display_session_label} <span class="session-time">{display_time_info}</span></h3>'
             master_html_buffer += f'<div class="cards-grid" data-share-session-grid="{session_share_key}">'
             
@@ -396,7 +400,7 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
             master_html_buffer += card_html
 
         if not is_search_mode:
-            master_html_buffer += '</div>'
+            master_html_buffer += '</div></section>'
             
     if is_search_mode:
         master_html_buffer += '</div>'

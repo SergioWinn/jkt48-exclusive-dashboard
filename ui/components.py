@@ -287,9 +287,7 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
         display_time_info = escape(time_info)
         
         if not is_search_mode:
-            original_member_count = len(sesi.get('session_detail', []))
-            compact_class = " is-compact" if available_only and len(members) * 2 < original_member_count else ""
-            master_html_buffer += f'<section class="session-group{compact_class}">'
+            master_html_buffer += '<section class="session-group">'
             master_html_buffer += f'<h3 class="session-heading" data-share-session-heading="{session_share_key}">{display_session_label} <span class="session-time">{display_time_info}</span></h3>'
             master_html_buffer += f'<div class="cards-grid" data-share-session-grid="{session_share_key}">'
             
@@ -1481,9 +1479,9 @@ def render_share_controls(storage_key, right_px=84):
             }
             target.querySelectorAll("[data-share-session-grid]").forEach(grid => {
                 if (!grid.querySelector(".ldp-card")) {
-                    const heading = target.querySelector(`[data-share-session-heading="${grid.dataset.shareSessionGrid}"]`);
-                    heading?.remove();
-                    grid.remove();
+                    const group = grid.closest(".session-group");
+                    if (group) group.remove();
+                    else grid.remove();
                 }
             });
             target.querySelectorAll("img").forEach(image => {

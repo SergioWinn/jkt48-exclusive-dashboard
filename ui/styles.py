@@ -736,11 +736,15 @@ div[class*="st-key-filter_date_"] [role="radiogroup"] label {
 }
 
 .capture-mode.available-only-layout > :not(.session-group),
-.capture-mode.available-only-layout > .session-group:not(.is-compact) {
+.capture-mode.available-only-layout > .session-group {
     grid-column: 1 / -1;
 }
 
-.capture-mode.available-only-layout > .session-group.is-compact .cards-grid {
+.capture-mode.available-only-layout > .session-group:not(:has(.ldp-card:nth-child(4))) {
+    grid-column: auto;
+}
+
+.capture-mode.available-only-layout > .session-group:not(:has(.ldp-card:nth-child(4))) .cards-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
 }
 
@@ -833,10 +837,24 @@ div[class*="st-key-filter_date_"] [role="radiogroup"] label {
     .summary-stat:first-child { border-inline-start: 0; }
     .st-key-summary_metrics [data-testid="stHorizontalBlock"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .cards-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--space-md); }
-    .available-only-layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--space-xl); }
+    .available-only-layout { container-type: inline-size; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--space-xl); }
     .available-only-layout > :not(.session-group),
-    .available-only-layout > .session-group:not(.is-compact) { grid-column: 1 / -1; }
-    .available-only-layout > .session-group.is-compact .cards-grid { grid-template-columns: repeat(auto-fill, 190px); }
+    .available-only-layout > .session-group { grid-column: 1 / -1; }
+}
+
+@container (min-width: 50.5rem) {
+    .available-only-layout > .session-group:not(:has(.ldp-card:nth-child(2))) { grid-column: auto; }
+    .available-only-layout > .session-group:not(:has(.ldp-card:nth-child(2))) .cards-grid { grid-template-columns: repeat(auto-fill, 190px); }
+}
+
+@container (min-width: 63.375rem) {
+    .available-only-layout > .session-group:not(:has(.ldp-card:nth-child(3))) { grid-column: auto; }
+    .available-only-layout > .session-group:not(:has(.ldp-card:nth-child(3))) .cards-grid { grid-template-columns: repeat(auto-fill, 190px); }
+}
+
+@container (min-width: 89.125rem) {
+    .available-only-layout > .session-group:not(:has(.ldp-card:nth-child(4))) { grid-column: auto; }
+    .available-only-layout > .session-group:not(:has(.ldp-card:nth-child(4))) .cards-grid { grid-template-columns: repeat(auto-fill, 190px); }
 }
 
 @media (hover: hover) and (pointer: fine) {

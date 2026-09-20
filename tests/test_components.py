@@ -12,7 +12,7 @@ from ui.styles import GLOBAL_CSS
 
 class EventCardsTest(unittest.TestCase):
     @patch("ui.components.st.markdown")
-    def test_available_only_packs_sessions_with_less_than_half_remaining(self, markdown):
+    def test_available_only_packs_sessions_by_viewport_capacity(self, markdown):
         members = lambda available: [
             {"label": f"Jalur {index}", "jkt48_member_name": f"Member {index}", "available_quota": int(index <= available)}
             for index in range(1, 5)
@@ -26,10 +26,10 @@ class EventCardsTest(unittest.TestCase):
 
         html = markdown.call_args.args[0]
         self.assertIn('id="laporan-container" class="available-only-layout"', html)
-        self.assertEqual(html.count('class="session-group is-compact"'), 1)
-        self.assertEqual(html.count('class="session-group'), 2)
-        self.assertIn(".available-only-layout { display: grid; grid-template-columns: repeat(2", GLOBAL_CSS)
+        self.assertEqual(html.count('class="session-group"'), 2)
+        self.assertIn(".available-only-layout { container-type: inline-size; display: grid;", GLOBAL_CSS)
         self.assertIn(".capture-mode.available-only-layout {\n    display: grid !important;", GLOBAL_CSS)
+        self.assertIn("@container (min-width: 63.375rem)", GLOBAL_CSS)
 
     @patch("ui.components.st.iframe")
     def test_cards_are_not_hidden_until_scrolled_into_view(self, iframe):
@@ -43,6 +43,7 @@ class EventCardsTest(unittest.TestCase):
         capture = iframe.call_args.args[0]
         self.assertIn('image.loading = "eager"', capture)
         self.assertIn("await waitForCaptureAssets(state.target)", capture)
+        self.assertIn('const group = grid.closest(".session-group");', capture)
 
     @unittest.skipUnless(shutil.which("node"), "Node is needed to check share JavaScript")
     @patch("ui.components.st.iframe")

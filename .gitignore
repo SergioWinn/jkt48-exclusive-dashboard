@@ -14,7 +14,6 @@ __pycache__/
 .streamlit/*
 !.streamlit/secrets.example.toml
 .runtime_cache/
-.wrangler/
 
 # Hallmark
 .hallmark

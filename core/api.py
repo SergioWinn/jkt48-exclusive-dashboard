@@ -457,7 +457,7 @@ def _sync_error_label(error):
     return "Invalid API response"
 
 
-@st.cache_data(ttl=4, show_spinner=False)
+@st.cache_data(ttl=5, show_spinner=False)
 def _fetch_exclusive_detail_shared(code):
     print(f"[sync] event={code} fetching detail and bonus", flush=True)
     url = f"https://jkt48.com/api/v1/exclusives/{code}?lang=id"

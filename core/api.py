@@ -268,8 +268,9 @@ def _write_cache(cache_file, payload):
             temporary = file.name
             json.dump(payload, file)
         os.replace(temporary, cache_file)
+        return True
     except OSError:
-        pass
+        return False
     finally:
         if temporary and os.path.exists(temporary):
             try:
@@ -523,3 +524,47 @@ def fetch_exclusive_detail(code):
 
 def clear_exclusive_detail_cache():
     _fetch_exclusive_detail_shared.clear()
+
+
+def import_exclusive_snapshot(code, detail_json, bonus_json=""):
+    if not isinstance(code, str) or not code.isascii() or not code.isalnum():
+        raise ValueError("Kode event tidak valid.")
+
+    def parse(raw):
+        if len(raw) > 2_000_000:
+            raise ValueError("JSON maksimal 2 MB per kolom.")
+        try:
+            payload = json.loads(raw)
+        except (ValueError, RecursionError) as error:
+            raise ValueError("JSON tidak valid. Tempel respons JSON lengkap.") from error
+        if not isinstance(payload, dict) or payload.get("status", True) is not True:
+            raise ValueError("Gunakan respons API yang berhasil, bukan respons error.")
+        return payload.get("data", payload)
+
+    data = parse(detail_json)
+    try:
+        _validate_detail(data, code)
+        if "session" not in data:
+            raise ValueError("JSON detail harus memuat session.")
+        if bonus_json.strip():
+            data = _apply_bonus_stock(data, parse(bonus_json))
+    except LiveApiUnavailable as error:
+        raise ValueError("Kode event atau struktur detail/bonus tidak sesuai.") from error
+    for item, fields in [(data, ("default_price",))] + [
+        (member, ("available_quota", "tickets_sold"))
+        for session in data["session"] for member in session.get("session_detail", [])
+    ]:
+        for field in fields:
+            if item.get(field) is not None and (type(item[field]) is not int or item[field] < 0):
+                raise ValueError(f"{field} harus berupa bilangan bulat nonnegatif.")
+    periods = data.get("sales_period", [])
+    if not isinstance(periods, list) or any(
+        not isinstance(period, dict) or not isinstance(period.get("label", ""), str) for period in periods
+    ):
+        raise ValueError("sales_period tidak valid.")
+    stamp = (datetime.now(timezone.utc) + timedelta(hours=7)).strftime("%d/%m/%Y %H:%M:%S WIB")
+    payload = {"last_updated": stamp, "data": data}
+    if not _write_cache(os.path.join(RUNTIME_CACHE_DIR, f"exclusive_{code}.json"), payload):
+        raise OSError("Snapshot gagal disimpan. Data sebelumnya tetap dipertahankan.")
+    clear_exclusive_detail_cache()
+    return payload

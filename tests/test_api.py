@@ -2,7 +2,6 @@ import json
 import os
 import unittest
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 from unittest.mock import Mock, patch
 
 from core.api import (
@@ -335,14 +334,6 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
         self.assertNotIn("tickets_sold", member)
         self.assertTrue(status.call_args.args[1])
         self.assertEqual(write_cache.call_args.args[1]["data"], data)
-
-    def test_legacy_event_json_files_are_removed(self):
-        project_root = Path(__file__).parent.parent
-        fallback_dir = project_root / "data" / "fallback"
-
-        remaining_files = sorted(path.name for path in fallback_dir.glob("*.json"))
-
-        self.assertEqual(remaining_files, ["exclusive_events.json", "members.json"])
 
 
 if __name__ == "__main__":

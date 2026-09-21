@@ -87,6 +87,12 @@ JKT48_COOKIE
 
 Use this only when Cloudflare Waiting Room mitigation is required. Cookies are configured through the environment; the dashboard has no cookie input dialog.
 
+## Admin JSON import
+
+In the admin view, select an event and open **Tempel JSON**. Open the detail API link in your browser and paste its complete successful JSON response into **JSON detail**. Optionally paste the bonus API response into **JSON bonus**, then choose **Simpan snapshot**. The detail must match the selected event code.
+
+Imports are shown as cached data, dated at import time, and shared through the runtime snapshot. Automatic API refresh continues. Invalid input or a failed write leaves the previous snapshot intact. Imported snapshots are local to the running instance and do not provide persistent storage across redeployments.
+
 ## Testing
 
 Run all tests:
@@ -107,6 +113,8 @@ python -m compileall app.py core ui tests
 - Keep `.streamlit/secrets.toml` local only.
 - Ensure `data/member_metadata.csv` is updated when member generation or team data changes.
 - The app can continue showing cached or fallback data when the live upstream API is blocked or unavailable.
+- Keep a `data/fallback/<event-code>.json` detail snapshot for every event in the bundled catalogue. These files must ship with the app so a fresh deployment can display sessions even when the API is blocked.
+- `.runtime_cache` is local, ignored by Git, and may be lost when the hosting instance is replaced. Bundled snapshots retain their original update times; preserving the latest live data across instance replacement requires persistent external storage.
 - Admin share/capture features depend on browser clipboard support.
 
 ## Disclaimer

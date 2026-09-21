@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -9,6 +10,50 @@ from core import api
 
 
 class ApiResilienceTest(unittest.TestCase):
+    def test_manual_import_validates_before_replacing_snapshot(self):
+        detail = {"code": "EXIMPORT", "session": [{"date": "2099-01-01", "start_time": "11:00",
+                  "session_detail": [{"label": "1", "jkt48_member_name": "Member", "available_quota": 7}]}]}
+        bonus = {"status": True, "data": [{"date": "2099-01-01", "start_time": "11:00",
+                 "session_members": [{"label": "1", "member_name": "Member", "available_quota": 2}]}]}
+        with tempfile.TemporaryDirectory() as directory, patch("core.api.RUNTIME_CACHE_DIR", directory):
+            saved = api.import_exclusive_snapshot("EXIMPORT", json.dumps(detail), json.dumps(bonus))
+            self.assertEqual(saved["data"]["session"][0]["session_detail"][0]["available_quota"], 2)
+            path = Path(directory) / "exclusive_EXIMPORT.json"
+            original = path.read_bytes()
+            for invalid in ("{", "[]", json.dumps({"status": False, "data": detail}),
+                            json.dumps({**detail, "code": "OTHER"}), json.dumps({"code": "EXIMPORT"}),
+                            json.dumps({**detail, "default_price": "bad"}),
+                            json.dumps({**detail, "session": [None]})):
+                with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                    api.import_exclusive_snapshot("EXIMPORT", invalid)
+                self.assertEqual(path.read_bytes(), original)
+            with self.assertRaises(ValueError):
+                api.import_exclusive_snapshot("EXIMPORT", json.dumps(detail), '{"status": true, "data": [null]}')
+            with patch("core.api.os.replace", side_effect=PermissionError), self.assertRaises(OSError):
+                api.import_exclusive_snapshot("EXIMPORT", json.dumps(detail))
+            self.assertEqual(path.read_bytes(), original)
+
+    @patch("core.api._set_wr_status")
+    @patch("core.api._get_json", side_effect=api.LiveApiUnavailable("Cloudflare challenge"))
+    def test_cold_start_recovers_every_bundled_event_without_runtime_cache(self, _get_json, status):
+        folder = Path(__file__).parents[1] / "data" / "fallback"
+        catalogue = json.loads((folder / "exclusive_events.json").read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as empty_cache, patch("core.api.RUNTIME_CACHE_DIR", empty_cache):
+            api.get_active_exclusive_events.clear()
+            api.clear_exclusive_detail_cache()
+            self.assertTrue(api.get_active_exclusive_events())
+            for event in catalogue["data"]:
+                code = event["code"]
+                with self.subTest(code=code):
+                    snapshot = json.loads((folder / f"{code}.json").read_text(encoding="utf-8"))
+                    detail = api.fetch_exclusive_detail(code)
+                    self.assertEqual(detail, snapshot["data"])
+                    self.assertIsInstance(detail["session"], list)
+                    if code in ("EXD1A1", "EXA6F1", "EX5B99"):
+                        self.assertTrue(any(s["session_detail"] for s in detail["session"]))
+                    self.assertEqual(status.call_args.args[:3], (code, False, snapshot["last_updated"]))
+            self.assertEqual(list(Path(empty_cache).iterdir()), [])
+
     @patch("core.api.USING_BROWSER_CLIENT", True)
     @patch("core.api.browser_requests.Session.get")
     def test_chrome_challenge_falls_back_to_safari(self, get):

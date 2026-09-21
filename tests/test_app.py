@@ -1,3 +1,5 @@
+import json
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -7,57 +9,36 @@ from core.api import LiveApiUnavailable, clear_exclusive_detail_cache
 
 
 class DashboardNoticesTest(unittest.TestCase):
-    def test_outage_keeps_dashboard_visible_and_manual_refresh_recovers(self):
-        event = {"code": "EXRECOVER", "title": "Recovery event", "category": "DIGITAL_PHOTOBOOK",
-                 "valid_date_to": "2000-01-01T00:00:00", "session": [{
-                     "date": "2000-01-01", "start_time": "11:00", "label": "Sesi 1",
-                     "session_detail": [{"label": "1", "jkt48_member_name": "Member", "available_quota": 7}],
-                 }]}
-        with patch("core.api.get_active_exclusive_events", return_value=[event]), \
+    def test_admin_import_replaces_refresh_and_recovers_during_outage(self):
+        event = {"code": "EXRECOVER", "title": "Recovery event", "category": "DIGITAL_PHOTOBOOK"}
+        detail = {**event, "session": [{"date": "2099-01-01", "start_time": "11:00", "label": "Sesi 1",
+                  "session_detail": [{"label": "1", "jkt48_member_name": "Member", "available_quota": 7}]}]}
+        with tempfile.TemporaryDirectory() as cache, \
+             patch("core.api.RUNTIME_CACHE_DIR", cache), \
+             patch("core.api.get_active_exclusive_events", return_value=[event]), \
              patch("core.api.get_member_database", return_value=({}, {})), \
-             patch("core.api._read_latest_cache", return_value={"data": event, "last_updated": "last good"}), \
-             patch("core.api._write_cache"), \
-             patch("core.api._get_json", side_effect=LiveApiUnavailable("Cloudflare challenge")) as get_json, \
-             patch("builtins.print") as log:
+             patch("core.api._get_json", side_effect=LiveApiUnavailable("Cloudflare challenge")):
             clear_exclusive_detail_cache()
             app = AppTest.from_file(str(Path(__file__).parents[1] / "app.py"))
             app.secrets["ADMIN_KEYS"] = ["test-key"]
             app.query_params["akses"] = "test-key"
             app.run(timeout=15)
+            self.assertFalse(any(b.key == "manual_refresh" for b in app.button))
+            app.text_area(key="import_detail_EXRECOVER").input("not json")
+            next(b for b in app.button if b.label == "Simpan snapshot").click().run(timeout=15)
+            self.assertTrue(app.error)
+            self.assertEqual(list(Path(cache).iterdir()), [])
+            app.text_area(key="import_detail_EXRECOVER").input(json.dumps({"status": True, "data": detail}))
+            next(b for b in app.button if b.label == "Simpan snapshot").click().run(timeout=15)
             self.assertEqual(len(app.exception), 0)
-            self.assertEqual(app.session_state["event_data_EXRECOVER"], event)
-            self.assertFalse(app.session_state["wr_status_EXRECOVER"]["is_live"])
-            app.session_state["event_fetch_attempt_EXRECOVER"] = 0.0
-            clear_exclusive_detail_cache()
-            app.run(timeout=15)
-            self.assertEqual(get_json.call_count, 4)
-            app.button(key="manual_refresh").click().run(timeout=15)
-            self.assertEqual(len(app.exception), 0)
-            self.assertEqual(len(app.warning), 0)
-            self.assertTrue(any(c.value == ":orange[Failed]" for c in app.caption))
-            self.assertEqual(app.session_state["event_data_EXRECOVER"], event)
+            self.assertEqual(app.session_state["event_data_EXRECOVER"], detail)
             self.assertFalse(app.session_state["wr_status_EXRECOVER"]["is_live"])
             self.assertTrue(any("CACHED DATA" in m.value for m in app.markdown))
-            lines = "\n".join(str(call.args[0]) for call in log.call_args_list)
-            self.assertIn("manual refresh requested", lines)
-            self.assertIn("detail=FAILED reason=Cloudflare challenge", lines)
-            self.assertIn("bonus=FAILED reason=Cloudflare challenge", lines)
-            self.assertIn("result=FAILED source=CACHED snapshot=last good", lines)
-            get_json.side_effect = [{"status": True, "data": event}, {"status": True, "data": [{
-                "date": "2000-01-01", "start_time": "11:00", "session_members": [{
-                    "label": "1", "member_name": "Member", "available_quota": 2,
-                }],
-            }]}]
-            app.button(key="manual_refresh").click().run(timeout=15)
-            self.assertEqual(len(app.exception), 0)
-            self.assertTrue(app.session_state["wr_status_EXRECOVER"]["is_live"])
-            self.assertEqual(len(app.success), 0)
-            self.assertTrue(any(c.value == ":green[Successful]" for c in app.caption))
-            lines = "\n".join(str(call.args[0]) for call in log.call_args_list)
-            self.assertIn("detail=OK", lines)
-            self.assertIn("bonus=OK", lines)
-            self.assertIn("result=SUCCESSFUL source=LIVE", lines)
-            self.assertEqual(app.session_state["event_data_EXRECOVER"]["session"][0]["session_detail"][0]["available_quota"], 2)
+            self.assertEqual(json.loads((Path(cache) / "exclusive_EXRECOVER.json").read_text())["data"], detail)
+            visitor = AppTest.from_file(str(Path(__file__).parents[1] / "app.py")).run(timeout=15)
+            self.assertEqual(len(visitor.exception), 0)
+            self.assertEqual(len(visitor.text_area), 0)
+            self.assertEqual(visitor.session_state["event_data_EXRECOVER"], detail)
             clear_exclusive_detail_cache()
 
     def test_closed_event_uses_static_fragment_after_first_snapshot(self):
@@ -116,7 +97,7 @@ class DashboardNoticesTest(unittest.TestCase):
                 self.assertEqual(len(messages), 1)
                 self.assertEqual(messages[0].value, "Bonus belum tersedia.")
                 self.assertNotIn("Jumlah terjual tidak tersedia", messages[0].value)
-                self.assertEqual(app.button(key="manual_refresh").label, "Refresh")
+                self.assertEqual(app.text_area(key="import_detail_EXTEST").label, "JSON detail")
                 self.assertFalse(any(button.label == "Mitigate Waiting Room" for button in app.button))
 
 

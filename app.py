@@ -7,7 +7,7 @@ from html import escape
 from pathlib import Path
 
 from core.api import (
-    clear_exclusive_detail_cache,
+    import_exclusive_snapshot,
     fetch_exclusive_detail,
     get_active_exclusive_events,
     get_member_database,
@@ -73,6 +73,35 @@ if isinstance(admin_keys, str):
 access_key = st.query_params.get("akses", "")
 is_admin = bool(access_key and access_key in admin_keys)
 
+
+def render_json_import(selected_event):
+    if not is_admin:
+        st.error("Hanya admin yang dapat mengimpor data.")
+        return
+    code = selected_event["code"]
+    st.write(f"Event: **{code}**")
+    st.markdown(f"[Buka JSON detail](https://jkt48.com/api/v1/exclusives/{code}?lang=id) · "
+                f"[Buka JSON bonus](https://jkt48.com/api/v1/exclusives/{code}/bonus?lang=id)")
+    st.caption("Salin respons API lengkap. Waktu snapshot memakai waktu impor; data bukan live. "
+               "Snapshot lokal dapat hilang saat server diganti atau di-redeploy.")
+    with st.form(f"import_json_{code}"):
+        detail = st.text_area("JSON detail", height=200, key=f"import_detail_{code}")
+        bonus = st.text_area("JSON bonus (opsional)", height=120, key=f"import_bonus_{code}")
+        submitted = st.form_submit_button("Simpan snapshot", type="primary")
+    if submitted:
+        try:
+            snapshot = import_exclusive_snapshot(code, detail, bonus)
+        except (ValueError, OSError) as error:
+            st.error(str(error))
+            return
+        st.session_state[f"event_data_{code}"] = {**selected_event, **snapshot["data"]}
+        st.session_state[f"wr_status_{code}"] = {
+            "is_live": False, "time": snapshot["last_updated"], "reason": "Impor JSON admin",
+        }
+        st.session_state[f"event_fetch_attempt_{code}"] = time.monotonic()
+        st.session_state["snapshot_imported"] = code
+        st.rerun()
+
 def _render_dashboard(
     selected_event,
     search_query,
@@ -96,9 +125,7 @@ def _render_dashboard(
             st.rerun()
     refresh_interval = get_detail_refresh_interval(event_data, wr_info.get("is_live", True), now_wib)
     last_attempt = st.session_state.get(attempt_state_key, 0.0)
-    manual_refresh = st.session_state.pop("manual_refresh_requested", False)
-
-    should_fetch = manual_refresh or event_state_key not in st.session_state or (
+    should_fetch = event_state_key not in st.session_state or (
         (not closed or not wr_info.get("is_live", True)) and time.monotonic() - last_attempt >= refresh_interval
     )
     if event_code and should_fetch:
@@ -144,24 +171,8 @@ def _render_dashboard(
         title_slot = st.container()
         with st.container(horizontal=True, vertical_alignment="center", width="content", gap="small"):
             if is_admin:
-                with st.container(width="content", gap=None):
-                    if st.button(
-                        "Refresh", icon=":material/refresh:", type="tertiary",
-                        help="Refresh data sekarang", key="manual_refresh",
-                    ):
-                        print(f"[sync] event={event_code} manual refresh requested", flush=True)
-                        get_member_database.clear()
-                        get_active_exclusive_events.clear()
-                        clear_exclusive_detail_cache()
-                        st.session_state["manual_refresh_requested"] = True
-                        st.rerun()
-                    result = "\u00a0"
-                    if manual_refresh:
-                        succeeded = has_event_detail and wr_info.get("is_live") and not wr_info.get("reason")
-                        result = ":green[Successful]" if succeeded else ":orange[Failed]"
-                        if has_event_detail and wr_info.get("is_live") and wr_info.get("reason"):
-                            result = ":orange[Partial]"
-                    st.caption(result, width="content")
+                with st.popover("Tempel JSON", icon=":material/data_object:"):
+                    render_json_import(selected_event)
             st.markdown(
                 f'<div class="source-readout {source_class}">'
                 f'<strong>{source_label}</strong>'
@@ -179,6 +190,8 @@ def _render_dashboard(
         """,
         unsafe_allow_html=True,
     )
+    if st.session_state.pop("snapshot_imported", None) == event_code:
+        st.success("Snapshot JSON tersimpan.")
 
     event_closed = closed
 

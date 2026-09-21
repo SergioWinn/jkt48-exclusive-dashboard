@@ -165,14 +165,23 @@ def _set_wr_status(code, is_live, time_label, reason=""):
         pass
 
 
+def _get_http_session(browser):
+    sessions = st.session_state.setdefault("_http_sessions", {})
+    if browser not in sessions:
+        sessions[browser] = browser_requests.Session()
+    return sessions[browser]
+
+
 def _send_http_get(url, timeout, headers):
     kwargs = {"timeout": timeout, "headers": headers}
     if USING_BROWSER_CLIENT:
+        # Let each impersonation profile supply its matching browser headers.
+        kwargs["headers"] = {key: value for key, value in headers.items() if key.lower() != "user-agent"}
         responses = []
         last_error = None
         for browser in ("chrome136", "safari184"):
             try:
-                response = browser_requests.get(url, impersonate=browser, **kwargs)
+                response = _get_http_session(browser).get(url, impersonate=browser, **kwargs)
             except Exception as error:
                 last_error = error
                 continue
@@ -183,7 +192,7 @@ def _send_http_get(url, timeout, headers):
         if responses:
             return responses[-1]
         raise last_error or RuntimeError("No HTTP response")
-    return browser_requests.get(url, **kwargs)
+    return _get_http_session("requests").get(url, **kwargs)
 
 
 def _is_waiting_room_response(response):

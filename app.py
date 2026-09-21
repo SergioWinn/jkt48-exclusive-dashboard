@@ -46,7 +46,7 @@ if install_motion_observer:
 # --- RENDER MAIN HEADER ---
 st.html(
     """
-    <div class="ldp-header">
+    <div class="ldp-header" data-fetch-version="playwright-trial">
         <div class="ldp-wordmark">
             <div class="ldp-brand">
                 <span class="ldp-brand-icon" aria-hidden="true">

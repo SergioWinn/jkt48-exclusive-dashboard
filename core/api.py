@@ -3,6 +3,8 @@
 import json
 import os
 import tempfile
+import shutil
+from types import SimpleNamespace
 from datetime import datetime, timedelta, timezone
 
 import streamlit as st
@@ -219,6 +221,11 @@ def _http_get(url, timeout):
     _waiting_room_detected = _is_cloudflare_gate_response(response)
     if _waiting_room_detected and (cookie := get_jkt48_cookie()):
         response = _send_http_get(url, timeout, {**FALLBACK_HEADERS, "Cookie": cookie})
+    if _is_cloudflare_gate_response(response) and shutil.which("chromium") and shutil.which("xvfb-run"):
+        from core.browser_fetch import fetch_response
+        browser_response = fetch_response(url, timeout)
+        if browser_response["status_code"] == 200:
+            response = SimpleNamespace(**browser_response, json=lambda: json.loads(browser_response["text"]))
     return response
 
 

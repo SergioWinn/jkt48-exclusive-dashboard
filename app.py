@@ -79,15 +79,37 @@ def render_json_import(selected_event):
         st.error("Hanya admin yang dapat mengimpor data.")
         return
     code = selected_event["code"]
-    st.write(f"Event: **{code}**")
-    st.markdown(f"[Buka JSON detail](https://jkt48.com/api/v1/exclusives/{code}?lang=id) · "
-                f"[Buka JSON bonus](https://jkt48.com/api/v1/exclusives/{code}/bonus?lang=id)")
-    st.caption("Salin respons API lengkap. Waktu snapshot memakai waktu impor; data bukan live. "
-               "Snapshot lokal dapat hilang saat server diganti atau di-redeploy.")
-    with st.form(f"import_json_{code}"):
-        detail = st.text_area("JSON detail", height=200, key=f"import_detail_{code}")
-        bonus = st.text_area("JSON bonus (opsional)", height=120, key=f"import_bonus_{code}")
-        submitted = st.form_submit_button("Simpan snapshot", type="primary")
+    with st.container(key=f"json_import_{code}"):
+        st.markdown(
+            f"""
+            <section class="json-import-head">
+                <span>ADMIN SNAPSHOT · {escape(code)}</span>
+                <h3>Perbarui data cadangan</h3>
+                <p>Tempel respons API lengkap. Detail wajib; bonus menambahkan angka stok terbaru.</p>
+            </section>
+            """,
+            unsafe_allow_html=True,
+        )
+        detail_link, bonus_link = st.columns(2)
+        with detail_link:
+            st.link_button("Buka detail ↗", f"https://jkt48.com/api/v1/exclusives/{code}?lang=id",
+                           use_container_width=True)
+        with bonus_link:
+            st.link_button("Buka bonus ↗", f"https://jkt48.com/api/v1/exclusives/{code}/bonus?lang=id",
+                           use_container_width=True)
+        st.caption("Snapshot bertanggal waktu impor, bukan data live. Data lokal dapat hilang saat server di-redeploy.")
+        with st.form(f"import_json_{code}"):
+            detail = st.text_area(
+                "JSON detail (wajib)", height=220, key=f"import_detail_{code}",
+                placeholder='{"status": true, "data": { ... }}',
+                help="Salin seluruh respons dari tautan Detail.",
+            )
+            bonus = st.text_area(
+                "JSON bonus (opsional)", height=140, key=f"import_bonus_{code}",
+                placeholder='{"status": true, "data": [ ... ]}',
+                help="Salin respons dari tautan Bonus bila tersedia.",
+            )
+            submitted = st.form_submit_button("Simpan snapshot lokal", type="primary", use_container_width=True)
     if submitted:
         try:
             snapshot = import_exclusive_snapshot(code, detail, bonus)

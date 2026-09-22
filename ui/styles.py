@@ -252,6 +252,90 @@ body,
 }
 
 /* Streamlit control rails */
+.st-key-json_import_ {
+    min-width: 0;
+    padding-block: var(--space-2xs) var(--space-sm);
+}
+
+.json-import-head {
+    min-width: 0;
+    margin-bottom: var(--space-md);
+    padding: var(--space-md);
+    border-inline-start: 3px solid var(--color-accent);
+    background: var(--color-paper-2);
+    color: var(--color-ink);
+}
+
+.json-import-head span {
+    display: block;
+    margin-bottom: var(--space-xs);
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+}
+
+.json-import-head h3 {
+    margin: 0;
+    color: var(--color-ink);
+    font-family: var(--font-display);
+    font-size: var(--text-md);
+    font-style: normal;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+}
+
+.json-import-head p {
+    margin: var(--space-xs) 0 0;
+    color: var(--color-ink-2);
+    font-size: var(--text-sm);
+    line-height: 1.45;
+}
+
+.st-key-json_import_ [data-testid="stTextArea"] textarea {
+    border: 1px solid var(--color-rule);
+    border-radius: var(--radius-input);
+    background: var(--color-paper-2);
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    line-height: 1.55;
+}
+
+.st-key-json_import_ [data-testid="stTextArea"] textarea:focus {
+    border-color: var(--color-focus);
+    box-shadow: 0 0 0 2px var(--color-shadow);
+}
+
+.st-key-json_import_ [data-testid="stFormSubmitButton"] button {
+    min-height: 2.75rem;
+    font-family: var(--font-body);
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    transition: transform var(--dur-micro) var(--ease-out), opacity var(--dur-short) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .st-key-json_import_ [data-testid="stFormSubmitButton"] button:hover:not(:disabled) {
+        transform: translateY(-1px);
+    }
+}
+
+.st-key-json_import_ [data-testid="stFormSubmitButton"] button:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+.st-key-json_import_ [data-testid="stFormSubmitButton"] button:focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 3px;
+}
+
+.st-key-json_import_ [data-testid="stFormSubmitButton"] button:disabled {
+    cursor: not-allowed;
+    opacity: 0.56;
+}
+
 .st-key-event_filters {
     padding-block: var(--space-md);
     border-bottom: 1px solid var(--color-rule);

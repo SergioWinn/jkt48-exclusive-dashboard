@@ -25,11 +25,11 @@ class DashboardNoticesTest(unittest.TestCase):
             app.run(timeout=15)
             self.assertFalse(any(b.key == "manual_refresh" for b in app.button))
             app.text_area(key="import_detail_EXRECOVER").input("not json")
-            next(b for b in app.button if b.label == "Simpan snapshot").click().run(timeout=15)
+            next(b for b in app.button if b.label == "Simpan snapshot lokal").click().run(timeout=15)
             self.assertTrue(app.error)
             self.assertEqual(list(Path(cache).iterdir()), [])
             app.text_area(key="import_detail_EXRECOVER").input(json.dumps({"status": True, "data": detail}))
-            next(b for b in app.button if b.label == "Simpan snapshot").click().run(timeout=15)
+            next(b for b in app.button if b.label == "Simpan snapshot lokal").click().run(timeout=15)
             self.assertEqual(len(app.exception), 0)
             self.assertEqual(app.session_state["event_data_EXRECOVER"], detail)
             self.assertFalse(app.session_state["wr_status_EXRECOVER"]["is_live"])
@@ -97,7 +97,7 @@ class DashboardNoticesTest(unittest.TestCase):
                 self.assertEqual(len(messages), 1)
                 self.assertEqual(messages[0].value, "Bonus belum tersedia.")
                 self.assertNotIn("Jumlah terjual tidak tersedia", messages[0].value)
-                self.assertEqual(app.text_area(key="import_detail_EXTEST").label, "JSON detail")
+                self.assertEqual(app.text_area(key="import_detail_EXTEST").label, "JSON detail (wajib)")
                 self.assertFalse(any(button.label == "Mitigate Waiting Room" for button in app.button))
 
 

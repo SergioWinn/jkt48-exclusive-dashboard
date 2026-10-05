@@ -20,21 +20,26 @@ def fetch_bonus_json(url, timeout):
         return None
     if not _browser_lock.acquire(timeout=1):
         return None
+    failure = "unknown error"
     try:
         print("[browser] trying Playwright bonus fallback", flush=True)
         result = subprocess.run(
             ["xvfb-run", "-a", sys.executable, str(Path(__file__).resolve()), url, str(timeout)],
             capture_output=True, text=True, encoding="utf-8", timeout=timeout + 10,
         )
+        if result.returncode:
+            lines = [line.strip() for line in result.stderr.splitlines() if line.strip()]
+            failure = lines[-1] if lines else f"process exited {result.returncode}"
         payload = json.loads(result.stdout) if result.returncode == 0 else None
         if isinstance(payload, dict) and payload.get("status") is True:
             print("[browser] bonus=OK", flush=True)
             return payload
-    except (OSError, ValueError, subprocess.TimeoutExpired):
-        pass
+        failure = "invalid browser response"
+    except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+        failure = f"{type(error).__name__}: {error}"
     finally:
         _browser_lock.release()
-    print("[browser] bonus=FAILED", flush=True)
+    print(f"[browser] bonus=FAILED reason={failure[:300]}", flush=True)
     return None
 
 
@@ -54,6 +59,7 @@ if __name__ == "__main__":
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(
             executable_path=shutil.which("chromium"), headless=False, timeout=5000,
+            args=["--disable-dev-shm-usage"],
         )
         try:
             page = browser.new_page()
@@ -66,7 +72,10 @@ if __name__ == "__main__":
                 )
             except PlaywrightTimeout:
                 pass
-            payload = json.loads(page.locator("body").inner_text(timeout=1000))
+            try:
+                payload = json.loads(page.locator("body").inner_text(timeout=1000))
+            except ValueError as error:
+                raise ValueError(f"Non-JSON browser page: {page.title()!r}") from error
             if not isinstance(payload, dict) or payload.get("status") is not True:
                 raise ValueError("Invalid bonus API response")
             print(json.dumps(payload))

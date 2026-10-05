@@ -56,14 +56,26 @@ class ApiResilienceTest(unittest.TestCase):
 
     @patch("core.api.USING_BROWSER_CLIENT", True)
     @patch("core.api.browser_requests.Session.get")
-    def test_chrome_challenge_falls_back_to_safari(self, get):
+    def test_challenge_is_not_retried(self, get):
         challenge = Mock(status_code=403, headers={"content-type": "text/html"})
-        live = Mock(status_code=200, headers={"content-type": "application/json"})
-        get.side_effect = [challenge, live]
-        self.assertIs(api._send_http_get("https://jkt48.com/api/v1/members", 12, api.FALLBACK_HEADERS), live)
-        self.assertEqual([c.kwargs["impersonate"] for c in get.call_args_list], ["chrome136", "safari184"])
+        get.return_value = challenge
+        self.assertIs(api._send_http_get("https://jkt48.com/api/v1/members", 12, api.FALLBACK_HEADERS), challenge)
+        self.assertEqual([c.kwargs["impersonate"] for c in get.call_args_list], ["chrome"])
         for call in get.call_args_list:
             self.assertEqual(call.kwargs["headers"], api.BASE_HEADERS)
+
+    @patch("core.api.USING_BROWSER_CLIENT", True)
+    @patch("core.api.browser_requests.Session.get")
+    def test_rate_limit_and_server_errors_try_safari(self, get):
+        live = Mock(status_code=200, headers={"content-type": "application/json"})
+        for status in (429, 500):
+            with self.subTest(status=status):
+                get.reset_mock()
+                get.side_effect = [Mock(status_code=status, headers={}), live]
+                self.assertIs(api._send_http_get("https://jkt48.com/api/v1/members", 12,
+                                                 api.FALLBACK_HEADERS), live)
+                self.assertEqual([call.kwargs["impersonate"] for call in get.call_args_list],
+                                 ["chrome", "safari"])
 
     def test_session_reuses_cookies_without_mixing_browsers_or_users(self):
         received = []
@@ -88,14 +100,14 @@ class ApiResilienceTest(unittest.TestCase):
                     url = f"http://127.0.0.1:{server.server_port}/"
                     api._send_http_get(url, 5, api.FALLBACK_HEADERS)
                     api._send_http_get(url, 5, api.FALLBACK_HEADERS)
-                    chrome = api._get_http_session("chrome136")
-                    safari = api._get_http_session("safari184")
+                    chrome = api._get_http_session("chrome")
+                    safari = api._get_http_session("safari")
                     self.assertIsNot(chrome, safari)
                     self.assertNotIn("visit", safari.cookies)
                     for session in api.st.session_state["_http_sessions"].values():
                         session.close()
                 with patch("core.api.st.session_state", {}):
-                    fresh = api._get_http_session("chrome136")
+                    fresh = api._get_http_session("chrome")
                     self.assertIsNot(fresh, chrome)
                     self.assertNotIn("visit", fresh.cookies)
                     fresh.close()
@@ -179,13 +191,20 @@ class ApiResilienceTest(unittest.TestCase):
         self.assertEqual(get.call_args.kwargs["timeout"], 20)
 
     @patch("core.api.USING_BROWSER_CLIENT", True)
+    @patch("core.api.browser_requests.Session.get", side_effect=OSError)
+    def test_non_timeout_error_is_not_retried(self, get):
+        with self.assertRaises(OSError):
+            api._send_http_get("https://jkt48.com/api/v1/members", 12, api.FALLBACK_HEADERS)
+        get.assert_called_once()
+
+    @patch("core.api.USING_BROWSER_CLIENT", True)
     @patch("core.api.browser_requests.Session.get")
     def test_successful_chrome_keeps_cookie_and_timeout_with_profile_headers(self, get):
         get.return_value = Mock(status_code=200, headers={"content-type": "application/json"})
         url = "https://jkt48.com/api/v1/members"
         headers = {**api.FALLBACK_HEADERS, "Cookie": "manual=value"}
         api._send_http_get(url, 12, headers)
-        get.assert_called_once_with(url, impersonate="chrome136", timeout=12,
+        get.assert_called_once_with(url, impersonate="chrome", timeout=12,
                                    headers={**api.BASE_HEADERS, "Cookie": "manual=value"})
         self.assertEqual(headers["User-Agent"], api.FALLBACK_HEADERS["User-Agent"])
 

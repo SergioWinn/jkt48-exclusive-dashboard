@@ -9,9 +9,11 @@ import streamlit as st
 
 try:
     from curl_cffi import requests as browser_requests
+    from curl_cffi.requests.exceptions import Timeout as HttpTimeout
     USING_BROWSER_CLIENT = True
 except ImportError:
     import requests as browser_requests
+    from requests.exceptions import Timeout as HttpTimeout
     USING_BROWSER_CLIENT = False
 
 BASE_HEADERS = {
@@ -177,20 +179,23 @@ def _send_http_get(url, timeout, headers):
     if USING_BROWSER_CLIENT:
         # Let each impersonation profile supply its matching browser headers.
         kwargs["headers"] = {key: value for key, value in headers.items() if key.lower() != "user-agent"}
-        responses = []
+        response = None
         last_error = None
-        for browser in ("chrome136", "safari184"):
+        for browser in ("chrome", "safari"):
             try:
                 response = _get_http_session(browser).get(url, impersonate=browser, **kwargs)
-            except Exception as error:
+            except (HttpTimeout, TimeoutError) as error:
                 last_error = error
                 continue
-            responses.append(response)
+            except Exception:
+                raise
             content_type = response.headers.get("content-type", "").lower()
             if response.status_code == 200 and "json" in content_type:
                 return response
-        if responses:
-            return responses[-1]
+            if response.status_code != 429 and response.status_code < 500:
+                return response
+        if response is not None:
+            return response
         raise last_error or RuntimeError("No HTTP response")
     return _get_http_session("requests").get(url, **kwargs)
 

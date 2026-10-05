@@ -2,6 +2,7 @@ import json
 import os
 import unittest
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
 
 from core.api import (
@@ -188,12 +189,13 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
     @patch("core.api._get_json", side_effect=LiveApiUnavailable("Cloudflare challenge"))
     def test_active_fallback_event_with_future_end_date_is_not_dropped(self, _get_json, read_cache):
         get_active_exclusive_events.clear()
+        now = datetime.now()
         active_payload = {
             "last_updated": "18/09/2026 12:13:38 WIB",
             "data": [{
                 "code": "EXFUTURE",
-                "valid_date_from": "2026-06-15T05:00:00.000Z",
-                "valid_date_to": "2026-10-01T23:59:59.000Z",
+                "valid_date_from": (now - timedelta(days=1)).isoformat(),
+                "valid_date_to": (now + timedelta(days=1)).isoformat(),
             }],
         }
         read_cache.side_effect = [None, active_payload]
@@ -206,12 +208,13 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
     @patch("core.api._get_json", side_effect=LiveApiUnavailable("Cloudflare challenge"))
     def test_fallback_keeps_multiple_valid_events_when_live_api_is_down(self, _get_json, read_cache):
         get_active_exclusive_events.clear()
+        now = datetime.now()
         payload = {
             "last_updated": "18/09/2026 12:13:38 WIB",
             "data": [
-                {"code": "EX01", "valid_date_from": "2026-06-15T05:00:00.000Z", "valid_date_to": "2026-10-01T23:59:59.000Z"},
-                {"code": "EX02", "valid_date_from": "2026-07-16T13:00:00.000Z", "valid_date_to": "2026-11-01T23:59:59.000Z"},
-                {"code": "EX03", "valid_date_from": "2026-08-20T13:00:00.000Z", "valid_date_to": "2026-12-01T23:59:59.000Z"},
+                {"code": f"EX0{day}", "valid_date_from": (now - timedelta(days=1)).isoformat(),
+                 "valid_date_to": (now + timedelta(days=day)).isoformat()}
+                for day in range(1, 4)
             ],
         }
         read_cache.side_effect = [None, payload]

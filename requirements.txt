@@ -1,3 +1,4 @@
 streamlit==1.60.0
 requests
 curl-cffi==0.16.3
+playwright==1.63.0

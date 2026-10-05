@@ -119,16 +119,41 @@ class ApiResilienceTest(unittest.TestCase):
     @patch("core.api._set_wr_status")
     @patch("core.api._write_cache")
     @patch("core.api._read_latest_cache")
+    @patch("core.browser_fetch.fetch_bonus_json")
     @patch("core.api._get_json")
-    def test_live_main_data_survives_bonus_failure(self, get_json, cache, write, status):
+    def test_live_main_data_survives_bonus_failure(self, get_json, browser, cache, write, status):
         api.clear_exclusive_detail_cache()
         live = {"code": "EXPARTIAL", "title": "New title", "session": []}
         cache.return_value = {"data": {**live, "title": "Old title"}, "last_updated": "old"}
         get_json.side_effect = [{"data": live}, api.LiveApiUnavailable("Cloudflare challenge")]
+        browser.return_value = None
         self.assertEqual(api.fetch_exclusive_detail("EXPARTIAL"), live)
         self.assertTrue(status.call_args.args[1])
         self.assertIn("Bonus:", status.call_args.args[3])
         write.assert_not_called()
+
+    @patch("core.api._set_wr_status")
+    @patch("core.api._write_cache")
+    @patch("core.api._read_latest_cache")
+    @patch("core.browser_fetch.fetch_bonus_json")
+    @patch("core.api._get_json")
+    def test_browser_recovers_failed_bonus_request(self, get_json, browser, _cache, write, status):
+        api.clear_exclusive_detail_cache()
+        live = {"code": "EXBROWSER", "session": [{
+            "date": "2099-01-01", "start_time": "11:00", "session_detail": [{
+                "label": "1", "jkt48_member_name": "Member", "available_quota": 7,
+            }],
+        }]}
+        get_json.side_effect = [{"data": live}, api.LiveApiUnavailable("Cloudflare challenge")]
+        browser.return_value = {"status": True, "data": [{
+            "date": "2099-01-01", "start_time": "11:00", "session_members": [{
+                "label": "1", "member_name": "Member", "available_quota": 2,
+            }],
+        }]}
+        result = api.fetch_exclusive_detail("EXBROWSER")
+        self.assertEqual(result["session"][0]["session_detail"][0]["available_quota"], 2)
+        self.assertTrue(status.call_args.args[1])
+        write.assert_called_once()
 
     def tearDown(self):
         api.get_active_exclusive_events.clear()

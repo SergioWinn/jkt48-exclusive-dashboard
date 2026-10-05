@@ -499,7 +499,15 @@ def _fetch_exclusive_detail_shared(code):
             time_label = "Bundled emergency fallback" if data else "No Cache Available"
 
     try:
-        bonus = _get_json(f"https://jkt48.com/api/v1/exclusives/{code}/bonus?lang=id", 12)
+        bonus_url = f"https://jkt48.com/api/v1/exclusives/{code}/bonus?lang=id"
+        try:
+            bonus = _get_json(bonus_url, 12)
+        except LiveApiUnavailable:
+            from core.browser_fetch import fetch_bonus_json
+
+            bonus = fetch_bonus_json(bonus_url, 12)
+            if bonus is None:
+                raise
         data = _apply_bonus_stock(data or {"code": code}, bonus.get("data"))
         print(f"[sync] event={code} bonus=OK", flush=True)
         is_live, reason, time_label = True, "", waktu_sekarang

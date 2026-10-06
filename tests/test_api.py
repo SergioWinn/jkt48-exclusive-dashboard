@@ -22,6 +22,11 @@ from core.api import (
 
 
 class GetActiveExclusiveEventsTest(unittest.TestCase):
+    def setUp(self):
+        browser = patch("core.browser_fetch.fetch_event_json", return_value={})
+        browser.start()
+        self.addCleanup(browser.stop)
+
     @patch("core.api._get_json")
     def test_member_photos_survive_missing_runtime_cache_and_empty_api(self, get_json):
         for result in (LiveApiUnavailable("Cloudflare challenge"), {"status": True, "data": []}):

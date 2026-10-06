@@ -9,6 +9,11 @@ from core.api import LiveApiUnavailable, clear_exclusive_detail_cache
 
 
 class DashboardNoticesTest(unittest.TestCase):
+    def setUp(self):
+        browser = patch("core.browser_fetch.fetch_event_json", return_value={})
+        browser.start()
+        self.addCleanup(browser.stop)
+
     def test_admin_import_replaces_refresh_and_recovers_during_outage(self):
         event = {"code": "EXRECOVER", "title": "Recovery event", "category": "DIGITAL_PHOTOBOOK"}
         detail = {**event, "session": [{"date": "2099-01-01", "start_time": "11:00", "label": "Sesi 1",

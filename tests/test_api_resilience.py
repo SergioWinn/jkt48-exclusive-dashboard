@@ -10,6 +10,11 @@ from core import api
 
 
 class ApiResilienceTest(unittest.TestCase):
+    def setUp(self):
+        browser = patch("core.browser_fetch.fetch_event_json", return_value={})
+        browser.start()
+        self.addCleanup(browser.stop)
+
     def test_manual_import_validates_before_replacing_snapshot(self):
         detail = {"code": "EXIMPORT", "session": [{"date": "2099-01-01", "start_time": "11:00",
                   "session_detail": [{"label": "1", "jkt48_member_name": "Member", "available_quota": 7}]}]}

@@ -163,6 +163,7 @@ def _render_dashboard(
     closed = is_event_closed(event_data, now_wib)
     refresh_interval = get_detail_refresh_interval(event_data, wr_info.get("is_live", True), now_wib)
     has_event_detail = isinstance(event_data.get("session"), list)
+    bonus_cached = bool(has_event_detail and wr_info.get("is_live") and wr_info.get("reason"))
 
     if closed and wr_info.get("is_live"):
         source_class = "is-cached"
@@ -177,7 +178,7 @@ def _render_dashboard(
     elif wr_info.get("is_live"):
         source_class = "is-live"
         source_label = "LIVE DATA"
-        source_detail = "Auto refresh"
+        source_detail = "Auto refresh · Bonus cached" if bonus_cached else "Auto refresh"
         sync_label = wr_info.get("time") or "Waiting for first sync"
     else:
         source_class = "is-cached"
@@ -225,8 +226,6 @@ def _render_dashboard(
 
     if not has_event_detail and not event_closed:
         notices.append("Data belum tersedia. Mencoba kembali.")
-    elif not event_closed and wr_info.get("is_live") and wr_info.get("reason"):
-        notices.append("Bonus belum tersedia.")
 
     if notices:
         show_notice = st.warning if not wr_info.get("is_live") or not has_event_detail else st.info

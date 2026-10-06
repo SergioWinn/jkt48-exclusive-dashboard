@@ -67,7 +67,7 @@ class DashboardNoticesTest(unittest.TestCase):
             self.assertEqual(len(app.warning) + len(app.info), 0)
             self.assertFalse(any(b.key == "manual_refresh" for b in app.button))
 
-    def test_cached_status_replaces_notice_but_partial_live_data_keeps_notice(self):
+    def test_cached_status_replaces_notice_and_partial_live_data_is_compact(self):
         event = {"code": "EXTEST", "title": "Test event", "category": "DIGITAL_PHOTOBOOK",
                  "session": [{"date": "2099-09-13", "label": "Sesi 1", "start_time": "11:45:00",
                               "session_detail": [{"label": "Jalur 1", "jkt48_member_name": "Test Member",
@@ -94,9 +94,9 @@ class DashboardNoticesTest(unittest.TestCase):
                     self.assertIn("last sync", status)
                     self.assertEqual(app.session_state["event_data_EXTEST"], event)
                     continue
-                self.assertEqual(len(messages), 1)
-                self.assertEqual(messages[0].value, "Bonus belum tersedia.")
-                self.assertNotIn("Jumlah terjual tidak tersedia", messages[0].value)
+                self.assertEqual(len(messages), 0)
+                status = next(m.value for m in app.markdown if "LIVE DATA" in m.value)
+                self.assertIn("Bonus cached", status)
                 self.assertEqual(app.text_area(key="import_detail_EXTEST").label, "JSON detail (wajib)")
                 self.assertFalse(any(button.label == "Mitigate Waiting Room" for button in app.button))
 

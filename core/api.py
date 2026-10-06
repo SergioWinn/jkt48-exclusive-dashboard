@@ -502,32 +502,41 @@ def _fetch_exclusive_detail_shared(code):
     now_wib = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
     waktu_sekarang = now_wib.strftime('%d/%m/%Y %H:%M:%S WIB')
     is_live, reason, time_label = True, "", waktu_sekarang
+    browser_payloads = None
     try:
         data = _validate_detail(_get_json(url, 12).get("data"), code)
         print(f"[sync] event={code} detail=OK", flush=True)
     except LiveApiUnavailable as error:
-        print(f"[sync] event={code} detail=FAILED reason={_sync_error_label(error)}", flush=True)
-        is_live, reason = False, str(error)
-        cache_payload = _read_latest_cache(cache_file, bundled_cache_file)
-        if cache_payload and cache_payload.get("data"):
-            try:
-                data = _validate_detail(cache_payload["data"], code)
-            except LiveApiUnavailable:
-                data = None
-            time_label = cache_payload.get("last_updated", "Unknown")
-        else:
-            data = EMERGENCY_EXCLUSIVE_DETAILS.get(code)
-            time_label = "Bundled emergency fallback" if data else "No Cache Available"
+        from core.browser_fetch import fetch_event_json
+
+        browser_payloads = fetch_event_json(code, 12)
+        try:
+            data = _validate_detail(browser_payloads.get("detail", {}).get("data"), code)
+            print(f"[sync] event={code} detail=OK source=BROWSER", flush=True)
+        except (AttributeError, LiveApiUnavailable):
+            print(f"[sync] event={code} detail=FAILED reason={_sync_error_label(error)}", flush=True)
+            is_live, reason = False, str(error)
+            cache_payload = _read_latest_cache(cache_file, bundled_cache_file)
+            if cache_payload and cache_payload.get("data"):
+                try:
+                    data = _validate_detail(cache_payload["data"], code)
+                except LiveApiUnavailable:
+                    data = None
+                time_label = cache_payload.get("last_updated", "Unknown")
+            else:
+                data = EMERGENCY_EXCLUSIVE_DETAILS.get(code)
+                time_label = "Bundled emergency fallback" if data else "No Cache Available"
 
     try:
         bonus_url = f"https://jkt48.com/api/v1/exclusives/{code}/bonus?lang=id"
         try:
             bonus = _get_json(bonus_url, 12)
         except LiveApiUnavailable:
-            from core.browser_fetch import fetch_bonus_json
+            from core.browser_fetch import fetch_event_json
 
-            bonus = fetch_bonus_json(bonus_url, 12)
-            if bonus is None:
+            browser_payloads = browser_payloads or fetch_event_json(code, 12)
+            bonus = browser_payloads.get("bonus")
+            if not isinstance(bonus, dict) or bonus.get("status") is not True:
                 raise
         data = _apply_bonus_stock(data or {"code": code}, bonus.get("data"))
         print(f"[sync] event={code} bonus=OK", flush=True)

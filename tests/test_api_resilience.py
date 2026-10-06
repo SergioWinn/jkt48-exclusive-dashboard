@@ -119,7 +119,7 @@ class ApiResilienceTest(unittest.TestCase):
     @patch("core.api._set_wr_status")
     @patch("core.api._write_cache")
     @patch("core.api._read_latest_cache")
-    @patch("core.browser_fetch.fetch_bonus_json")
+    @patch("core.browser_fetch.fetch_event_json")
     @patch("core.api._get_json")
     def test_live_main_data_survives_bonus_failure(self, get_json, browser, cache, write, status):
         api.clear_exclusive_detail_cache()
@@ -135,7 +135,7 @@ class ApiResilienceTest(unittest.TestCase):
         }]}
         cache.return_value = {"data": cached, "last_updated": "old"}
         get_json.side_effect = [{"data": live}, api.LiveApiUnavailable("Cloudflare challenge")]
-        browser.return_value = None
+        browser.return_value = {}
         result = api.fetch_exclusive_detail("EXPARTIAL")
         self.assertEqual(result["title"], "New title")
         self.assertEqual(result["session"][0]["session_detail"][0]["available_quota"], 7)
@@ -146,23 +146,30 @@ class ApiResilienceTest(unittest.TestCase):
     @patch("core.api._set_wr_status")
     @patch("core.api._write_cache")
     @patch("core.api._read_latest_cache")
-    @patch("core.browser_fetch.fetch_bonus_json")
+    @patch("core.browser_fetch.fetch_event_json")
     @patch("core.api._get_json")
-    def test_browser_recovers_failed_bonus_request(self, get_json, browser, _cache, write, status):
+    def test_browser_recovers_failed_detail_and_bonus_requests(self, get_json, browser, _cache, write, status):
         api.clear_exclusive_detail_cache()
         live = {"code": "EXBROWSER", "session": [{
             "date": "2099-01-01", "start_time": "11:00", "session_detail": [{
                 "label": "1", "jkt48_member_name": "Member", "available_quota": 7,
             }],
         }]}
-        get_json.side_effect = [{"data": live}, api.LiveApiUnavailable("Cloudflare challenge")]
-        browser.return_value = {"status": True, "data": [{
-            "date": "2099-01-01", "start_time": "11:00", "session_members": [{
-                "label": "1", "member_name": "Member", "available_quota": 2,
-            }],
-        }]}
+        get_json.side_effect = [
+            api.LiveApiUnavailable("Cloudflare challenge"),
+            api.LiveApiUnavailable("Cloudflare challenge"),
+        ]
+        browser.return_value = {
+            "detail": {"status": True, "data": live},
+            "bonus": {"status": True, "data": [{
+                "date": "2099-01-01", "start_time": "11:00", "session_members": [{
+                    "label": "1", "member_name": "Member", "available_quota": 2,
+                }],
+            }]},
+        }
         result = api.fetch_exclusive_detail("EXBROWSER")
         self.assertEqual(result["session"][0]["session_detail"][0]["available_quota"], 2)
+        browser.assert_called_once_with("EXBROWSER", 12)
         self.assertTrue(status.call_args.args[1])
         write.assert_called_once()
 

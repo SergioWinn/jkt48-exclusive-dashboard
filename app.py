@@ -178,7 +178,7 @@ def _render_dashboard(
     elif wr_info.get("is_live"):
         source_class = "is-live"
         source_label = "LIVE DATA"
-        source_detail = "Auto refresh · Bonus cached" if bonus_cached else "Auto refresh"
+        source_detail = "Bonus cached" if bonus_cached else "Auto refresh"
         sync_label = wr_info.get("time") or "Waiting for first sync"
     else:
         source_class = "is-cached"

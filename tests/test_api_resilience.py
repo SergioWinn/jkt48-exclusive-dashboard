@@ -123,11 +123,22 @@ class ApiResilienceTest(unittest.TestCase):
     @patch("core.api._get_json")
     def test_live_main_data_survives_bonus_failure(self, get_json, browser, cache, write, status):
         api.clear_exclusive_detail_cache()
-        live = {"code": "EXPARTIAL", "title": "New title", "session": []}
-        cache.return_value = {"data": {**live, "title": "Old title"}, "last_updated": "old"}
+        live = {"code": "EXPARTIAL", "title": "New title", "session": [{
+            "date": "2099-01-01", "start_time": "11:00", "session_detail": [{
+                "label": "1", "jkt48_member_name": "Member",
+            }],
+        }]}
+        cached = {**live, "title": "Old title", "session": [{
+            "date": "2099-01-01", "start_time": "11:00", "session_detail": [{
+                "label": "1", "jkt48_member_name": "Member", "available_quota": 7,
+            }],
+        }]}
+        cache.return_value = {"data": cached, "last_updated": "old"}
         get_json.side_effect = [{"data": live}, api.LiveApiUnavailable("Cloudflare challenge")]
         browser.return_value = None
-        self.assertEqual(api.fetch_exclusive_detail("EXPARTIAL"), live)
+        result = api.fetch_exclusive_detail("EXPARTIAL")
+        self.assertEqual(result["title"], "New title")
+        self.assertEqual(result["session"][0]["session_detail"][0]["available_quota"], 7)
         self.assertTrue(status.call_args.args[1])
         self.assertIn("Bonus:", status.call_args.args[3])
         write.assert_not_called()

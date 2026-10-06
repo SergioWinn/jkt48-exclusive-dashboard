@@ -462,6 +462,27 @@ def _apply_bonus_stock(data, bonus_sessions):
     return {**data, "session": list(sessions.values())}
 
 
+def _apply_cached_stock(data, cached_data):
+    bonus_sessions = []
+    for session in cached_data.get("session", []) if isinstance(cached_data, dict) else []:
+        members = [
+            {
+                "label": member.get("label"),
+                "member_name": member.get("jkt48_member_name"),
+                "available_quota": member.get("available_quota"),
+            }
+            for member in session.get("session_detail", [])
+            if isinstance(member, dict) and "available_quota" in member
+        ]
+        if members:
+            bonus_sessions.append({
+                "date": session.get("date"),
+                "start_time": session.get("start_time"),
+                "session_members": members,
+            })
+    return _apply_bonus_stock(data, bonus_sessions)
+
+
 def _sync_error_label(error):
     message = str(error)
     for label in ("Cloudflare challenge", "Cloudflare Waiting Room", "Connection failed"):
@@ -514,6 +535,13 @@ def _fetch_exclusive_detail_shared(code):
     except LiveApiUnavailable as error:
         print(f"[sync] event={code} bonus=FAILED reason={_sync_error_label(error)}", flush=True)
         reason = f"{reason}; bonus: {error}" if reason else f"Bonus: {error}"
+        if is_live:
+            cache_payload = _read_latest_cache(cache_file, bundled_cache_file)
+            try:
+                data = _apply_cached_stock(data, cache_payload.get("data"))
+                print(f"[sync] event={code} bonus=CACHED snapshot={cache_payload.get('last_updated', 'Unknown')}", flush=True)
+            except (AttributeError, LiveApiUnavailable):
+                pass
     if is_live and not reason:
         _write_cache(cache_file, {"last_updated": time_label, "data": data})
     return {"data": data, "is_live": is_live, "reason": reason, "time": time_label}

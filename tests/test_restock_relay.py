@@ -4,12 +4,11 @@ import runpy
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import patch
 
 from starlette.requests import Request
 
-from core.restock_relay import collect_stock, restock
+from core.restock_relay import LiveApiUnavailable, collect_stock, restock
 
 
 class RestockRelayTest(unittest.TestCase):
@@ -89,13 +88,12 @@ class RestockRelayTest(unittest.TestCase):
         recent = {"code": "EXNEW", "category": "PHOTOCARD", "title": "New", "valid_date_from": datetime.now(timezone.utc).isoformat()}
         old = {**recent, "code": "EXOLD", "valid_date_from": "2025-01-01T00:00:00Z"}
         bonus = {"status": True, "data": [{"session_members": [{"member_name": "Member", "available_quota": 3}]}]}
-        def get(url, **kwargs):
-            data = {"status": True, "data": {"data": [recent, old]}} if url.endswith("exclusives?lang=id") else bonus
-            return SimpleNamespace(status_code=200, headers={"content-type": "application/json"}, json=lambda: data)
-        with patch("core.restock_relay.requests.Session") as session:
-            session.return_value.__enter__.return_value.get.side_effect = get
+        with patch("core.restock_relay.get_active_exclusive_events", return_value=[recent, old]), patch("core.restock_relay._get_json", return_value=bonus):
             payload = collect_stock(set(), {"PHOTOCARD"})
             self.assertEqual([item["event"]["code"] for item in payload["results"]], ["EXNEW"])
             self.assertEqual(payload["results"][0]["bonus"], bonus)
             payload = collect_stock({"EXOLD"}, {"PHOTOCARD"})
             self.assertEqual(len(payload["results"]), 2)
+        with patch("core.restock_relay.get_active_exclusive_events", return_value=[recent]), patch("core.restock_relay._get_json", side_effect=LiveApiUnavailable("Cloudflare challenge")), patch("core.restock_relay.fetch_event_json", return_value={}):
+            with self.assertRaises(LiveApiUnavailable):
+                collect_stock(set(), {"PHOTOCARD"})

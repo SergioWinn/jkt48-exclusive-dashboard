@@ -85,6 +85,7 @@ async def restock(request):
         return JSONResponse({"error": "Relay secret is not configured"}, status_code=503)
     received = request.headers.get("x-restock-token", "")
     if not hmac.compare_digest(received.encode(), token.encode()):
+        print(f"[restock-relay] auth={'token_mismatch' if received else 'missing_header'}", flush=True)
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
     body = bytearray()
     async for chunk in request.stream():

@@ -1,7 +1,4 @@
-# ASGI routes include the hosting baseUrlPath and need a full server restart.
 streamlit==1.60.0
-# Streamlit's gzip responder requires the pre-1.8 response-start behavior.
-starlette==1.7.0
 requests
 curl-cffi==0.16.3
 playwright==1.63.0

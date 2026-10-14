@@ -24,7 +24,7 @@ class DashboardNoticesTest(unittest.TestCase):
              patch("core.api.get_member_database", return_value=({}, {})), \
              patch("core.api._get_json", side_effect=LiveApiUnavailable("Cloudflare challenge")):
             clear_exclusive_detail_cache()
-            app = AppTest.from_file(str(Path(__file__).parents[1] / "dashboard.py"))
+            app = AppTest.from_file(str(Path(__file__).parents[1] / "app.py"))
             app.secrets["ADMIN_KEYS"] = ["test-key"]
             app.query_params["akses"] = "test-key"
             app.run(timeout=15)
@@ -40,7 +40,7 @@ class DashboardNoticesTest(unittest.TestCase):
             self.assertFalse(app.session_state["wr_status_EXRECOVER"]["is_live"])
             self.assertTrue(any("CACHED DATA" in m.value for m in app.markdown))
             self.assertEqual(json.loads((Path(cache) / "exclusive_EXRECOVER.json").read_text())["data"], detail)
-            visitor = AppTest.from_file(str(Path(__file__).parents[1] / "dashboard.py")).run(timeout=15)
+            visitor = AppTest.from_file(str(Path(__file__).parents[1] / "app.py")).run(timeout=15)
             self.assertEqual(len(visitor.exception), 0)
             self.assertEqual(len(visitor.text_area), 0)
             self.assertEqual(visitor.session_state["event_data_EXRECOVER"], detail)
@@ -59,7 +59,7 @@ class DashboardNoticesTest(unittest.TestCase):
         with patch("core.api.get_active_exclusive_events", return_value=[event]), \
              patch("core.api.get_member_database", return_value=({}, {})), \
              patch("core.api.fetch_exclusive_detail", return_value=event) as fetch:
-            app = AppTest.from_file(str(Path(__file__).parents[1] / "dashboard.py"))
+            app = AppTest.from_file(str(Path(__file__).parents[1] / "app.py"))
             app.session_state["wr_status_EXCLOSED"] = {
                 "is_live": True, "reason": "bonus: HTTP 404", "time": "last sync",
             }
@@ -84,7 +84,7 @@ class DashboardNoticesTest(unittest.TestCase):
                  patch("core.api.get_member_database", return_value=({}, {})), \
                  patch("core.api.fetch_exclusive_detail", return_value=event), \
                  patch("core.api.is_waiting_room_detected", return_value=True):
-                app = AppTest.from_file(str(Path(__file__).parents[1] / "dashboard.py"))
+                app = AppTest.from_file(str(Path(__file__).parents[1] / "app.py"))
                 app.secrets["ADMIN_KEYS"] = ["test-key"]
                 app.query_params["akses"] = "test-key"
                 app.session_state["wr_status_EXTEST"] = {

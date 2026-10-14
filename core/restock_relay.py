@@ -83,10 +83,6 @@ async def restock(request):
         return JSONResponse({"error": "Relay secret could not be loaded"}, status_code=503)
     if not token:
         return JSONResponse({"error": "Relay secret is not configured"}, status_code=503)
-    received = request.headers.get("x-restock-token", "")
-    if not hmac.compare_digest(received.encode(), token.encode()):
-        print(f"[restock-relay] auth={'token_mismatch' if received else 'missing_header'}", flush=True)
-        return JSONResponse({"error": "Unauthorized"}, status_code=401)
     body = bytearray()
     async for chunk in request.stream():
         body.extend(chunk)
@@ -94,6 +90,10 @@ async def restock(request):
             return JSONResponse({"error": "Payload too large"}, status_code=413)
     try:
         params = json.loads(body)
+        received = params.get("relayToken", "")
+        if not isinstance(received, str) or not hmac.compare_digest(received.encode(), token.encode()):
+            print(f"[restock-relay] auth={'token_mismatch' if received else 'missing_token'}", flush=True)
+            return JSONResponse({"error": "Unauthorized"}, status_code=401)
         tracked = params.get("trackedEventCodes", [])
         categories = params.get("categories", [])
         if not isinstance(tracked, list) or len(tracked) > 30 or any(not isinstance(code, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,48}", code) for code in tracked):

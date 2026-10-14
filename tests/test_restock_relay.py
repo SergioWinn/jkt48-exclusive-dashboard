@@ -17,8 +17,7 @@ class RestockRelayTest(unittest.TestCase):
         self.token = patch.dict("os.environ", {"RESTOCK_RELAY_TOKEN": "test-secret"})
         self.token.start()
         self.addCleanup(self.token.stop)
-        self.headers = {"X-Restock-Token": "test-secret"}
-        self.params = {"categories": ["PHOTOCARD"], "trackedEventCodes": []}
+        self.params = {"relayToken": "test-secret", "categories": ["PHOTOCARD"], "trackedEventCodes": []}
 
     def post(self, headers=None, json=None, content=None):
         import json as codec
@@ -31,10 +30,11 @@ class RestockRelayTest(unittest.TestCase):
 
     def test_authorization_and_validation_happen_before_fetch(self):
         with patch("core.restock_relay.collect_stock") as collect:
-            self.assertEqual(self.post(json=self.params).status_code, 401)
-            self.assertEqual(self.post(headers=self.headers, json={"categories": ["UNKNOWN"]}).status_code, 400)
-            self.assertEqual(self.post(headers=self.headers, json={**self.params, "trackedEventCodes": ["../../test"]}).status_code, 400)
-            self.assertEqual(self.post(headers=self.headers, content="x" * 4097).status_code, 413)
+            for token in ("", "wrong", 123):
+                self.assertEqual(self.post(json={**self.params, "relayToken": token}).status_code, 401)
+            self.assertEqual(self.post(json={**self.params, "categories": ["UNKNOWN"]}).status_code, 400)
+            self.assertEqual(self.post(json={**self.params, "trackedEventCodes": ["../../test"]}).status_code, 400)
+            self.assertEqual(self.post(content="x" * 4097).status_code, 413)
             collect.assert_not_called()
 
     def test_entry_point_registers_the_hosting_prefix(self):
@@ -78,12 +78,12 @@ class RestockRelayTest(unittest.TestCase):
     def test_endpoint_returns_live_payload_and_refuses_cached_success_on_failure(self):
         payload = {"results": []}
         with patch("core.restock_relay.collect_stock", return_value=payload):
-            response = self.post(headers=self.headers, json=self.params)
+            response = self.post(json=self.params)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(json.loads(response.body), payload)
             self.assertEqual(response.headers["cache-control"], "no-store")
         with patch("core.restock_relay.collect_stock", side_effect=RuntimeError("403")), patch("core.restock_relay.logging.exception"):
-            self.assertEqual(self.post(headers=self.headers, json=self.params).status_code, 502)
+            self.assertEqual(self.post(json=self.params).status_code, 502)
 
     def test_collects_only_recent_or_tracked_events_with_live_bonus(self):
         recent = {"code": "EXNEW", "category": "PHOTOCARD", "title": "New", "valid_date_from": datetime.now(timezone.utc).isoformat()}

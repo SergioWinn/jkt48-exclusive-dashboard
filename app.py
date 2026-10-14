@@ -16,7 +16,12 @@ class RestockRelayMiddleware:
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http" and scope.get("path") in self.paths:
             print(f"[restock-relay] request={scope['method']} path={scope['path']} root_path={scope.get('root_path', '')}", flush=True)
-            response = await restock(Request(scope, receive)) if scope["method"] == "POST" else JSONResponse({"error": "Method not allowed"}, status_code=405, headers={"Allow": "POST"})
+            try:
+                response = await restock(Request(scope, receive)) if scope["method"] == "POST" else JSONResponse({"error": "Method not allowed"}, status_code=405, headers={"Allow": "POST"})
+            except Exception as error:
+                print(f"[restock-relay] handler_error={type(error).__name__}", flush=True)
+                response = JSONResponse({"error": "Relay handler failed"}, status_code=503)
+            print(f"[restock-relay] response={response.status_code}", flush=True)
             await response(scope, receive, send)
             return
         await self.app(scope, receive, send)

@@ -60,12 +60,20 @@ class RestockRelayTest(unittest.TestCase):
             async def send(message):
                 sent.append(message)
             asyncio.run(trace(scope, receive, send))
-            self.assertEqual(log.call_args.args[0], "[restock-relay] request=POST path=/~/+/api/restock root_path=")
+            self.assertEqual(log.call_args_list[0].args[0], "[restock-relay] request=POST path=/~/+/api/restock root_path=")
             self.assertEqual(sent[0]["status"], 401)
             scope["method"] = "GET"
             sent.clear()
             asyncio.run(trace(scope, receive, send))
             self.assertEqual(sent[0]["status"], 405)
+            scope["method"] = "POST"
+            sent.clear()
+            async def broken_handler(request):
+                raise RuntimeError("hidden secret")
+            trace.__call__.__globals__["restock"] = broken_handler
+            asyncio.run(trace(scope, receive, send))
+            self.assertEqual(sent[0]["status"], 503)
+            self.assertNotIn("hidden secret", str(log.call_args_list))
 
     def test_endpoint_returns_live_payload_and_refuses_cached_success_on_failure(self):
         payload = {"results": []}

@@ -76,7 +76,11 @@ def collect_stock(tracked_codes, categories):
 
 
 async def restock(request):
-    token = os.getenv("RESTOCK_RELAY_TOKEN") or st.secrets.get("RESTOCK_RELAY_TOKEN", "")
+    try:
+        token = os.getenv("RESTOCK_RELAY_TOKEN") or st.secrets.get("RESTOCK_RELAY_TOKEN", "")
+    except Exception:
+        logging.exception("Restock relay secret could not be loaded")
+        return JSONResponse({"error": "Relay secret could not be loaded"}, status_code=503)
     if not token:
         return JSONResponse({"error": "Relay secret is not configured"}, status_code=503)
     received = request.headers.get("authorization", "")

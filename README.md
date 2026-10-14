@@ -27,7 +27,8 @@ This project is built as an operational tracker: it polls public event data, fal
 
 ```text
 .
-|-- app.py                    # Streamlit entry point
+|-- app.py                    # Streamlit ASGI entry point and authenticated stock route
+|-- dashboard.py              # Dashboard UI
 |-- core/
 |   |-- api.py                # JKT48 API access, cache, fallback, Waiting Room handling
 |   |-- refresh.py            # Refresh interval and sales-window helpers
@@ -108,6 +109,14 @@ python -m compileall app.py core ui tests
 ```
 
 ## Deployment Notes
+
+### Restock relay for the Telegram notifier
+
+`app.py` serves the dashboard and a separate `POST /api/restock` route using `st.App`. The route runs without an open dashboard tab. Set `RESTOCK_RELAY_TOKEN` in Streamlit Community Cloud **Settings > Secrets** and configure the same secret in the Cloudflare notifier. A local copy of the generated setting is in the ignored `.streamlit/restock-relay.secret.toml`; do not commit it.
+
+Cloudflare calls this route every 5 minutes while monitoring is ON. Send `Authorization: Bearer <RESTOCK_RELAY_TOKEN>` and JSON containing `categories` and `trackedEventCodes`. The relay discovers recent/tracked events, collects successful bonus API responses with the dashboard's browser-compatible HTTP client, and uses its Chromium fallback when available. It does not substitute bundled snapshots for failed live requests; Cloudflare retains its last snapshot on failure.
+
+Collection runs in a worker thread, is limited to one request at a time and 30 events, and has a 100-second budget. This is independent of the dashboard's 5-second UI refresh. Community Cloud may hibernate an inactive app; continuous operation and the effect of scheduled endpoint traffic must be verified after deployment. A failed relay call leaves monitoring ON but cannot generate fresh notifications.
 
 - Configure `ADMIN_KEYS` in the deployment secret manager, not in the repository.
 - Keep `.streamlit/secrets.toml` local only.

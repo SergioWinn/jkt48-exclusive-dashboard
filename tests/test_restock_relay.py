@@ -44,6 +44,17 @@ class RestockRelayTest(unittest.TestCase):
                 self.assertEqual(paths[0], expected)
                 self.assertIn("/~/+/api/restock", paths)
 
+    def test_precompressed_ui_responses_send_headers_before_body(self):
+        from streamlit.web.server.starlette.starlette_gzip_middleware import MediaAwareGZipMiddleware
+        messages = []
+        async def serve(scope, receive, send):
+            await send({"type": "http.response.start", "status": 200, "headers": [(b"content-encoding", b"gzip")]})
+            await send({"type": "http.response.body", "body": b"test"})
+        async def send(message):
+            messages.append(message["type"])
+        asyncio.run(MediaAwareGZipMiddleware(serve)({"type": "http", "path": "/probe", "headers": []}, None, send))
+        self.assertEqual(messages, ["http.response.start", "http.response.body"])
+
     def test_route_trace_logs_paths_without_headers_or_query_secrets(self):
         with patch("streamlit.App"), patch("builtins.print") as log:
             module = runpy.run_path(str(Path(__file__).parents[1] / "app.py"))

@@ -1,7 +1,9 @@
 import asyncio
 import json
+import runpy
 import unittest
 from datetime import datetime, timezone
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -34,6 +36,12 @@ class RestockRelayTest(unittest.TestCase):
             self.assertEqual(self.post(headers=self.headers, json={**self.params, "trackedEventCodes": ["../../test"]}).status_code, 400)
             self.assertEqual(self.post(headers=self.headers, content="x" * 4097).status_code, 413)
             collect.assert_not_called()
+
+    def test_entry_point_registers_the_hosting_prefix(self):
+        for prefix, expected in (("", "/api/restock"), ("/~/+", "/~/+/api/restock")):
+            with patch("streamlit.get_option", return_value=prefix), patch("streamlit.App") as app:
+                runpy.run_path(str(Path(__file__).parents[1] / "app.py"))
+                self.assertEqual(app.call_args.kwargs["routes"][0].path, expected)
 
     def test_endpoint_returns_live_payload_and_refuses_cached_success_on_failure(self):
         payload = {"results": []}

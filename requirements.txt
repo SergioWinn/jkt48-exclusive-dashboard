@@ -1,4 +1,4 @@
-# The ASGI entry point needs a full server restart, not only a dashboard rerun.
+# ASGI routes include the hosting baseUrlPath and need a full server restart.
 streamlit==1.60.0
 requests
 curl-cffi==0.16.3

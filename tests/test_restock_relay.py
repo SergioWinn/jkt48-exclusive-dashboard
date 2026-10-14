@@ -44,6 +44,18 @@ class RestockRelayTest(unittest.TestCase):
                 self.assertEqual(app.call_args.kwargs["routes"][0].path, expected)
                 self.assertIn("/~/+/api/restock", [route.path for route in app.call_args.kwargs["routes"]])
 
+    def test_route_trace_logs_paths_without_headers_or_query_secrets(self):
+        with patch("streamlit.App"), patch("builtins.print") as log:
+            module = runpy.run_path(str(Path(__file__).parents[1] / "app.py"))
+            log.reset_mock()
+            async def downstream(scope, receive, send):
+                pass
+            trace = module["RelayRouteTrace"](downstream)
+            scope = {"type": "http", "method": "POST", "path": "/~/+/api/restock", "root_path": "",
+                     "headers": [(b"authorization", b"Bearer secret")], "query_string": b"token=secret"}
+            asyncio.run(trace(scope, None, None))
+            self.assertEqual(log.call_args.args[0], "[restock-relay] request=POST path=/~/+/api/restock root_path=")
+
     def test_endpoint_returns_live_payload_and_refuses_cached_success_on_failure(self):
         payload = {"results": []}
         with patch("core.restock_relay.collect_stock", return_value=payload):

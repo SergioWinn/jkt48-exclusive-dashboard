@@ -1,3 +1,4 @@
+# The ASGI entry point needs a full server restart, not only a dashboard rerun.
 streamlit==1.60.0
 requests
 curl-cffi==0.16.3

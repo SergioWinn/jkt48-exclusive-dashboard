@@ -42,6 +42,7 @@ class RestockRelayTest(unittest.TestCase):
             with patch("streamlit.get_option", return_value=prefix), patch("streamlit.App") as app:
                 runpy.run_path(str(Path(__file__).parents[1] / "app.py"))
                 self.assertEqual(app.call_args.kwargs["routes"][0].path, expected)
+                self.assertIn("/~/+/api/restock", [route.path for route in app.call_args.kwargs["routes"]])
 
     def test_endpoint_returns_live_payload_and_refuses_cached_success_on_failure(self):
         payload = {"results": []}

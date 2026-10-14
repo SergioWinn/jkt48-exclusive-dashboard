@@ -17,7 +17,7 @@ class RestockRelayTest(unittest.TestCase):
         self.token = patch.dict("os.environ", {"RESTOCK_RELAY_TOKEN": "test-secret"})
         self.token.start()
         self.addCleanup(self.token.stop)
-        self.headers = {"Authorization": "Bearer test-secret"}
+        self.headers = {"X-Restock-Token": "test-secret"}
         self.params = {"categories": ["PHOTOCARD"], "trackedEventCodes": []}
 
     def post(self, headers=None, json=None, content=None):

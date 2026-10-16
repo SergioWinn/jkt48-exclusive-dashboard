@@ -1,23 +1,23 @@
-/* Hallmark · pre-emit critique: P5 H5 E4 S5 R5 V5
- * genre: modern-minimal · macrostructure: Ecosystem Index · theme: Cobalt
- * nav: N9 · footer: Ft2 · tone: technical · anchor hue: 256
- * type: Manrope / DM Sans / IBM Plex Mono
- */
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=IBM+Plex+Mono:wght@500;600;700&family=Manrope:wght@500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap");
 
 :root {
-    --color-paper: light-dark(oklch(98.5% 0.004 250), oklch(14% 0.012 258));
-    --color-paper-2: light-dark(oklch(96% 0.008 252), oklch(18% 0.014 258));
-    --color-paper-3: light-dark(oklch(92.5% 0.012 254), oklch(24% 0.016 258));
-    --color-ink: light-dark(oklch(24% 0.02 258), oklch(94% 0.008 252));
-    --color-ink-2: light-dark(oklch(34% 0.018 257), oklch(84% 0.01 254));
-    --color-muted: light-dark(oklch(46% 0.018 256), oklch(70% 0.012 255));
-    --color-rule: light-dark(oklch(86% 0.014 254), oklch(30% 0.016 258));
-    --color-rule-strong: light-dark(oklch(72% 0.022 255), oklch(44% 0.02 257));
-    --color-accent: light-dark(oklch(56% 0.2 256), oklch(68% 0.16 256));
-    --color-accent-strong: light-dark(oklch(48% 0.2 256), oklch(76% 0.13 256));
-    --color-accent-ink: light-dark(oklch(98.5% 0.004 250), oklch(16% 0.018 258));
-    --color-focus: light-dark(oklch(48% 0.2 256), oklch(78% 0.14 256));
+    --color-band: #153947;
+    --color-band-ink: #f4fbff;
+    --color-highlight: #8de8ef;
+    --color-highlight-ink: #123645;
+    --color-brand-blue: #166ee5;
+    --color-paper: light-dark(#f4fbff, #101c25);
+    --color-paper-2: light-dark(#eaf1f6, #182934);
+    --color-paper-3: light-dark(#dce8ef, #233d4b);
+    --color-ink: light-dark(#152f3e, #edf7fc);
+    --color-ink-2: light-dark(#365263, #c6dce8);
+    --color-muted: light-dark(#546d7c, #a5c1d0);
+    --color-rule: light-dark(#ccdae4, #3d5767);
+    --color-rule-strong: light-dark(#7c97a9, #7799ac);
+    --color-accent: light-dark(#11617b, #8de8ef);
+    --color-accent-strong: light-dark(#0c465c, #b6f2f6);
+    --color-accent-ink: light-dark(#f4fbff, #123645);
+    --color-focus: light-dark(#11617b, #b6f2f6);
     --color-success: light-dark(oklch(56% 0.15 155), oklch(66% 0.13 155));
     --color-success-soft: light-dark(oklch(94% 0.035 155), oklch(25% 0.045 155));
     --color-success-ink: light-dark(oklch(14% 0.045 155), oklch(92% 0.01 155));
@@ -27,20 +27,21 @@
     --color-status-warning-ink: oklch(20% 0.04 82);
     --color-danger: oklch(52% 0.19 25);
     --color-danger-soft: light-dark(oklch(94% 0.035 25), oklch(25% 0.05 25));
+    --color-danger-text: light-dark(oklch(38% 0.15 25), oklch(84% 0.09 25));
     --color-danger-ink: oklch(98% 0.006 25);
     --color-closed: oklch(42% 0.018 256);
-    --color-graphite: oklch(22% 0.016 260);
-    --color-graphite-2: oklch(28% 0.018 260);
-    --color-graphite-ink: oklch(94% 0.008 252);
-    --color-graphite-muted: oklch(76% 0.012 254);
-    --color-overlay: oklch(16% 0.016 260 / 0.64);
-    --color-shadow: light-dark(oklch(24% 0.02 258 / 0.1), oklch(5% 0.01 258 / 0.36));
-    --color-surface: var(--color-paper-2);
+    --color-graphite: #182934;
+    --color-graphite-2: #233d4b;
+    --color-graphite-ink: #edf7fc;
+    --color-graphite-muted: #a5c1d0;
+    --color-overlay: oklch(16% 0.025 230 / 0.64);
+    --color-shadow: light-dark(oklch(24% 0.035 230 / 0.1), oklch(5% 0.01 230 / 0.36));
+    --color-surface: light-dark(#ffffff, #1b303d);
     --color-surface-raised: var(--color-paper-3);
-    --color-photo: var(--color-paper);
+    --color-photo: var(--color-paper-2);
 
-    --font-display: "Manrope", sans-serif;
-    --font-body: "DM Sans", sans-serif;
+    --font-display: "Archivo", sans-serif;
+    --font-body: "Public Sans", sans-serif;
     --font-mono: "IBM Plex Mono", monospace;
 
     --space-3xs: 0.125rem;
@@ -61,7 +62,7 @@
     --text-display: clamp(2rem, 6vw, 3.25rem);
 
     --radius-input: 6px;
-    --radius-card: 10px;
+    --radius-card: 8px;
     --radius-md: var(--radius-card);
 
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);

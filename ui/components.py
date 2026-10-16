@@ -111,7 +111,7 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
     sessions = event_data.get('session', [])
     
     if not sessions:
-        st.info("Sessions are not available for this event yet.")
+        st.info("No sessions are listed for this event yet. Choose another event or check again later.")
         return
 
     now_wib = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
@@ -216,12 +216,21 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
         active_sessions = []
         for d_sessions in sessions_by_date.values():
             active_sessions.extend(d_sessions)
-        if active_sessions:
-            st.success(f"Showing all schedules for **'{search_query.title()}'** across dates.")
     else:
         if len(unique_dates) > 0:
             if len(unique_dates) > 1:
-                selected_date = st.radio("Select date", unique_dates, horizontal=True, key=f"filter_date_{event_id}")
+                date_key = f"filter_date_{event_id}"
+                previous_date = st.session_state.get(date_key, "")
+                if previous_date not in unique_dates:
+                    dated_options = [date for date in unique_dates if date_sort_key(date) != datetime.max]
+                    default_date = next(
+                        (date for date in dated_options if date_sort_key(date).date() >= now_wib.date()),
+                        (dated_options or unique_dates)[-1],
+                    )
+                    st.session_state[date_key] = next(
+                        (date for date in unique_dates if previous_date and date[:10] == previous_date[:10]), default_date,
+                    )
+                selected_date = st.radio("Select date", unique_dates, horizontal=True, key=date_key, persist_state="session")
             else:
                 selected_date = unique_dates[0]
                 st.markdown(f"**Event date:** {selected_date}")
@@ -232,12 +241,17 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
     if not active_sessions:
         if search_query:
             if matched_member_found:
-                st.warning(f"Member '{search_query.title()}' has no matching available tickets.")
+                st.warning(f"No available tickets match '{search_query}'. Turn off Available only to see closed and sold-out sessions.")
             else:
-                st.warning(f"Member '{search_query.title()}' not found in this event.")
+                st.warning(f"No schedules match '{search_query}' in this event. Try another member name or choose another event.")
+        elif available_only:
+            st.warning("No available tickets match this event. Turn off Available only to see closed and sold-out sessions.")
         else:
-            st.warning("No active tickets or available sessions right now.")
+            st.warning("No member sessions to show. Choose another event.")
         return
+
+    if search_query:
+        st.info("Showing matching schedules across all dates.")
 
     is_search_mode = bool(search_query)
     now_dt = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
@@ -333,7 +347,7 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
             else:
                 cls = "avail"
             if cls == "closed":
-                btn_text = f"{current_quota}&nbsp;LEFT&nbsp;AT&nbsp;CLOSE" if has_remaining else "CLOSED"
+                btn_text = "CLOSED"
             else:
                 btn_text = f"{current_quota if has_remaining else '&mdash;'}&nbsp;LEFT"
 
@@ -354,7 +368,8 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
                 initials = ''.join(part[0] for part in member_name.split()[:2]).upper() or '?'
                 img_html = f'<div class="c-photo c-photo-placeholder" aria-hidden="true">{escape(initials)}</div>'
                                         
-            sales_label = f"Status:&nbsp;<b>{'AVAILABLE' if is_available else 'SOLD OUT'}</b>"
+            status_label = "CLOSED" if cls == "closed" else "AVAILABLE" if is_available else "SOLD OUT"
+            sales_label = f"Status:&nbsp;<b>{status_label}</b>"
             combined_ui = f"""
             <div class="c-stats">
                 <span>{sales_label}</span>
@@ -441,7 +456,7 @@ def render_stats_controls(rows_by_tab=None, title="Event statistics", can_share=
     controls_html = r"""
     __CAPTURE_SCRIPT__
     <style>
-        :root { --stats-accent: oklch(56% 0.2 256); --stats-accent-strong: oklch(48% 0.2 256); --stats-ink: oklch(98.5% 0.004 250); --stats-focus: oklch(18% 0.02 258); --stats-shadow: oklch(24% 0.02 258 / 0.18); --ease-out: cubic-bezier(.16,1,.3,1); }
+        :root { --stats-accent: #11617b; --stats-accent-strong: #0c465c; --stats-ink: oklch(98.5% 0.004 250); --stats-focus: oklch(60% 0.13 230); --stats-shadow: oklch(24% 0.02 258 / 0.18); --ease-out: cubic-bezier(.16,1,.3,1); }
         body { margin: 0; background: transparent; display: flex; justify-content: center; align-items: center; overflow: hidden; }
         .stats-action { color: var(--stats-ink); border: 0; width: 48px; height: 48px; border-radius: 50%; background: var(--stats-accent); font-size: 19px; cursor: pointer; display: flex; justify-content: center; align-items: center; box-shadow: 0 1px 2px var(--stats-shadow); transition: transform 100ms var(--ease-out); }
         .stats-action svg { width: 20px; height: 20px; stroke: currentColor; }
@@ -479,28 +494,29 @@ def render_stats_controls(rows_by_tab=None, title="Event statistics", can_share=
         dialog.setAttribute("aria-labelledby", "event-stats-title");
         dialog.innerHTML = `
             <style>
-                #event-stats-dialog { --dialog-bg: var(--color-graphite); --dialog-surface: var(--color-graphite-2); --dialog-rule: var(--color-rule-strong); --dialog-ink: var(--color-graphite-ink); --dialog-ink-muted: var(--color-graphite-muted); --dialog-accent: var(--color-accent); --dialog-focus: var(--color-graphite-ink); --dialog-backdrop: var(--color-overlay); --dialog-shadow: var(--color-shadow); position: fixed; inset: 0; width: min(980px, calc(100% - 24px)); height: fit-content; max-height: min(760px, calc(100dvh - 24px)); margin: auto; padding: 0; border: 0; border-radius: var(--radius-card); background: var(--dialog-bg); color: var(--dialog-ink); font-family: var(--font-body); box-shadow: 0 1px 2px var(--dialog-shadow); }
+                #event-stats-dialog { color-scheme: dark; --dialog-bg: var(--color-graphite); --dialog-surface: var(--color-graphite-2); --dialog-rule: var(--color-rule-strong); --dialog-ink: var(--color-graphite-ink); --dialog-ink-muted: var(--color-graphite-muted); --dialog-accent: var(--color-accent); --dialog-focus: var(--color-graphite-ink); --dialog-backdrop: var(--color-overlay); --dialog-shadow: var(--color-shadow); position: fixed; inset: 0; width: min(980px, calc(100% - 24px)); height: fit-content; max-height: min(760px, calc(100dvh - 24px)); margin: auto; padding: 0; border: 0; border-radius: var(--radius-card); background: var(--dialog-bg); color: var(--dialog-ink); font-family: var(--font-body); box-shadow: 0 1px 2px var(--dialog-shadow); }
                 #event-stats-dialog::backdrop { background: var(--dialog-backdrop); }
-                #event-stats-dialog[open] { animation: stats-dialog-in var(--dur-short) var(--ease-out); }
+                #event-stats-dialog[open] { display: flex; flex-direction: column; overflow: hidden; animation: stats-dialog-in var(--dur-short) var(--ease-out); }
                 #event-stats-dialog[open]::backdrop { animation: stats-backdrop-in var(--dur-short) var(--ease-out); }
                 @keyframes stats-dialog-in { from { opacity: 0; transform: translateY(4px); } }
                 @keyframes stats-backdrop-in { from { opacity: 0; } }
-                .event-stats-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); padding: var(--space-md); border-bottom: 1px solid var(--dialog-surface); }
+                .event-stats-head { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); padding: var(--space-md); border-bottom: 1px solid var(--dialog-surface); }
                 .event-stats-head h2 { margin: 0; min-width: 0; font-family: var(--font-display); font-size: 18px; font-style: normal; line-height: 1.2; overflow-wrap: anywhere; }
+                .event-stats-feedback { flex: 0 0 auto; margin: 0; padding: var(--space-xs) var(--space-md); color: var(--dialog-ink); font-size: var(--text-sm); overflow-wrap: anywhere; }
                 .event-stats-actions { display: flex; flex: 0 0 auto; align-items: center; gap: var(--space-xs); }
                 .event-stats-share, .event-stats-close { width: 44px; height: 44px; flex: 0 0 44px; border: 0; border-radius: 50%; background: var(--dialog-surface); color: var(--dialog-ink); cursor: pointer; font-size: 20px; display: inline-grid; place-items: center; }
                 .event-stats-share[hidden] { display: none; }
                 .event-stats-share svg { width: 19px; height: 19px; stroke: currentColor; }
-                .event-stats-share[data-state="success"] { background: var(--dialog-accent); color: var(--stats-ink); }
+                .event-stats-share[data-state="success"] { background: var(--dialog-accent); color: var(--color-accent-ink); }
                 .event-stats-share[data-state="loading"], .event-stats-share:disabled { cursor: wait; opacity: 0.75; }
-                .event-stats-tabs { display: flex; gap: var(--space-xs); padding: var(--space-sm) var(--space-md) 0; }
+                .event-stats-tabs { flex: 0 0 auto; display: flex; gap: var(--space-xs); padding: var(--space-sm) var(--space-md) 0; }
                 .event-stats-tab { min-height: 44px; border: 0; border-radius: var(--radius-input); background: transparent; color: var(--dialog-ink-muted); padding: var(--space-xs) var(--space-sm); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
-                .event-stats-tab[aria-selected="true"] { background: var(--dialog-surface); color: var(--dialog-ink); }
-                .event-stats-filters { display: none; grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); padding: var(--space-sm) var(--space-md) 0; }
+                .event-stats-tab[aria-selected="true"] { background: var(--dialog-accent); color: var(--color-accent-ink); }
+                .event-stats-filters { flex: 0 0 auto; display: none; grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); padding: var(--space-sm) var(--space-md) 0; }
                 .event-stats-filters.is-visible { display: grid; }
                 .event-stats-filters label { display: grid; gap: var(--space-2xs); color: var(--dialog-ink-muted); font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
-                .event-stats-filters select { min-height: 44px; min-width: 0; border: 1px solid var(--dialog-surface); border-radius: var(--radius-input); background: var(--dialog-bg); color: var(--dialog-ink); padding-inline: var(--space-xs); font: inherit; }
-                .event-stats-body { max-height: calc(100dvh - 190px); overflow: auto; padding: var(--space-md); }
+                .event-stats-filters select { min-height: 44px; min-width: 0; border: 1px solid var(--dialog-rule); border-radius: var(--radius-input); background: var(--dialog-bg); color: var(--dialog-ink); padding-inline: var(--space-xs); font: inherit; }
+                .event-stats-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: var(--space-md); }
                 .event-stats-table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
                 .event-stats-table th, .event-stats-table td { padding: var(--space-xs); border-bottom: 1px solid var(--dialog-surface); text-align: left; white-space: pre-line; }
                 .event-stats-table th:first-child, .event-stats-table td:first-child { text-align: left; white-space: normal; overflow-wrap: anywhere; }
@@ -533,9 +549,9 @@ def render_stats_controls(rows_by_tab=None, title="Event statistics", can_share=
                 .event-stats-roster-chip .event-stats-avatar { width: 22px; height: 22px; flex-basis: 22px; font-size: 9px; }
                 .event-stats-empty { margin: 0; color: var(--dialog-ink-muted); }
                 #event-stats-dialog button:active { transform: translateY(1px); }
-                #event-stats-dialog button:focus-visible { outline: 3px solid var(--dialog-focus); outline-offset: 2px; }
+                #event-stats-dialog button:focus-visible, #event-stats-panel:focus-visible { outline: 3px solid var(--dialog-focus); outline-offset: 2px; }
                 @media (hover: hover) and (pointer: fine) {
-                    .event-stats-close:hover, .event-stats-share:hover, .event-stats-tab:hover { background: var(--dialog-surface); }
+                    .event-stats-close:hover, .event-stats-share:hover, .event-stats-tab:hover:not([aria-selected="true"]) { background: var(--dialog-surface); }
                 }
                 @media (min-width: 40rem) {
                     .event-stats-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -562,12 +578,13 @@ def render_stats_controls(rows_by_tab=None, title="Event statistics", can_share=
                     <button class="event-stats-close" type="button" aria-label="Close statistics">×</button>
                 </div>
             </div>
+            <p class="event-stats-feedback" role="status" aria-live="polite" hidden></p>
             <div class="event-stats-tabs" role="tablist" aria-label="Statistics groups"></div>
             <div class="event-stats-filters" aria-label="Member filters">
                 <label>Generation<select id="event-stats-generation"></select></label>
                 <label>Team<select id="event-stats-team"></select></label>
             </div>
-            <div class="event-stats-body"></div>`;
+            <div class="event-stats-body" id="event-stats-panel" role="tabpanel" tabindex="0"></div>`;
         window.parent.document.body.appendChild(dialog);
         window.addEventListener("unload", () => dialog.remove(), { once: true });
 
@@ -714,6 +731,11 @@ def render_stats_controls(rows_by_tab=None, title="Event statistics", can_share=
             shareButton.setAttribute("aria-label", detail || label);
             shareButton.dataset.state = state;
             shareButton.disabled = state === "loading";
+            const feedback = dialog.querySelector(".event-stats-feedback");
+            feedback.textContent = state === "error" ? detail || "The statistics image could not be copied. Try again."
+                : state === "success" ? "Copied to clipboard."
+                : state === "loading" ? "Preparing image…" : "";
+            feedback.hidden = !feedback.textContent;
         }
 
         function statsCaptureErrorMessage(error) {
@@ -764,6 +786,7 @@ def render_stats_controls(rows_by_tab=None, title="Event statistics", can_share=
                     }
                 });
                 target.querySelector(".event-stats-actions")?.remove();
+                target.querySelector(".event-stats-feedback")?.remove();
                 target.querySelector(".event-stats-tabs")?.remove();
                 target.querySelector(".event-stats-filters")?.remove();
                 if (selectedGeneration !== "All") removeCaptureColumn(target, "Generation");
@@ -779,6 +802,7 @@ def render_stats_controls(rows_by_tab=None, title="Event statistics", can_share=
                 targetBody.style.maxHeight = "none";
                 targetBody.style.overflow = "visible";
                 target.style.display = "block";
+                target.style.fontFamily = window.parent.getComputedStyle(source).fontFamily;
                 target.style.position = "relative";
                 target.style.inset = "auto";
                 target.style.width = `${Math.min(980, Math.max(680, Math.ceil(source.getBoundingClientRect().width)))}px`;
@@ -787,7 +811,7 @@ def render_stats_controls(rows_by_tab=None, title="Event statistics", can_share=
                 target.style.padding = "0";
                 const captureStyle = window.parent.document.createElement("style");
                 captureStyle.textContent = `
-                    #event-stats-capture-target { box-sizing: border-box; border-radius: 8px; background: rgb(24, 29, 36); color: rgb(232, 238, 245); font-family: Inter, Arial, sans-serif; overflow: hidden; }
+                    #event-stats-capture-target { box-sizing: border-box; border-radius: 8px; background: rgb(24, 29, 36); color: rgb(232, 238, 245); overflow: hidden; }
                     #event-stats-capture-target * { box-sizing: border-box; box-shadow: none !important; }
                     #event-stats-capture-target .event-stats-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 24px; border-bottom: 1px solid rgb(31, 37, 46); }
                     #event-stats-capture-target .event-stats-head h2 { margin: 0; font-size: 20px; line-height: 1.2; overflow-wrap: anywhere; }
@@ -907,7 +931,9 @@ def render_stats_controls(rows_by_tab=None, title="Event statistics", can_share=
         }
 
         function renderRows(rows) {
-            if (!rows.length) return `<p class="event-stats-empty">No statistics available.</p>`;
+            if (!rows.length) return `<p class="event-stats-empty">${isMemberFiltered()
+                ? "No members match these filters. Set Generation and Team to All."
+                : "No member statistics are available for this event."}</p>`;
             const columns = Object.keys(rows[0]);
             const table = `<table class="event-stats-table">
                 <thead><tr>${columns.map(column => `<th>${escapeHtml(column)}</th>`).join("")}</tr></thead>
@@ -933,7 +959,7 @@ def render_stats_controls(rows_by_tab=None, title="Event statistics", can_share=
         }
 
         function renderGroupRows(rows) {
-            if (!rows.length) return `<p class="event-stats-empty">No statistics available.</p>`;
+            if (!rows.length) return `<p class="event-stats-empty">No statistics are available for this group.</p>`;
             return `<div class="event-stats-rank-list">${rows.map(row => {
                 const displayName = activeTab === "Generation" ? `Gen ${row.Name}` : row.Name;
                 const members = String(row.Members || "").split(",").map(member => member.trim()).filter(Boolean);
@@ -985,19 +1011,29 @@ def render_stats_controls(rows_by_tab=None, title="Event statistics", can_share=
             const tabs = Object.keys(payload.rowsByTab || {});
             if (!tabs.includes(activeTab)) activeTab = tabs[0] || "";
             dialog.querySelector("#event-stats-title").textContent = payload.title || "Event statistics";
-            tabList.replaceChildren(...tabs.map(tab => {
-                const button = window.parent.document.createElement("button");
-                button.type = "button";
-                button.className = "event-stats-tab";
-                button.textContent = tab;
-                button.setAttribute("role", "tab");
-                button.setAttribute("aria-selected", String(tab === activeTab));
-                button.addEventListener("click", () => {
-                    activeTab = tab;
-                    render();
-                });
-                return button;
-            }));
+            if (JSON.stringify([...tabList.children].map(button => button.textContent)) !== JSON.stringify(tabs)) {
+                tabList.replaceChildren(...tabs.map((tab, index) => {
+                    const button = window.parent.document.createElement("button");
+                    button.type = "button";
+                    button.id = `event-stats-tab-${index}`;
+                    button.className = "event-stats-tab";
+                    button.textContent = tab;
+                    button.setAttribute("role", "tab");
+                    button.setAttribute("aria-controls", "event-stats-panel");
+                    button.addEventListener("click", () => {
+                        activeTab = tab;
+                        render();
+                    });
+                    return button;
+                }));
+            }
+            [...tabList.children].forEach(button => {
+                const selected = button.textContent === activeTab;
+                button.setAttribute("aria-selected", String(selected));
+                button.tabIndex = selected ? 0 : -1;
+                if (selected) body.setAttribute("aria-labelledby", button.id);
+            });
+            if (!tabs.length) body.removeAttribute("aria-labelledby");
             const memberRows = rowsByTab().Member || [];
             const generations = [...new Set(memberRows.map(row => row.Generation).filter(Boolean))].sort((a, b) => Number(a) - Number(b) || String(a).localeCompare(String(b)));
             const teams = [...new Set(memberRows.map(row => row.Team).filter(Boolean))].sort();
@@ -1016,6 +1052,18 @@ def render_stats_controls(rows_by_tab=None, title="Event statistics", can_share=
             });
         }
 
+        tabList.addEventListener("keydown", event => {
+            const buttons = [...tabList.children];
+            const index = buttons.indexOf(event.target);
+            if (index < 0 || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+            event.preventDefault();
+            const direction = window.parent.getComputedStyle(tabList).direction === "rtl" ? -1 : 1;
+            const step = event.key === "ArrowRight" ? direction : -direction;
+            const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1
+                : (index + step + buttons.length) % buttons.length;
+            buttons[next].click();
+            buttons[next].focus();
+        });
         generationFilter.addEventListener("change", () => {
             selectedGeneration = generationFilter.value;
             render();
@@ -1025,6 +1073,7 @@ def render_stats_controls(rows_by_tab=None, title="Event statistics", can_share=
             render();
         });
         dialog.querySelector(".event-stats-close").addEventListener("click", () => dialog.close());
+        dialog.addEventListener("close", () => document.getElementById("stats-btn")?.focus());
         shareButton.addEventListener("click", copyStatsImage);
         dialog.addEventListener("click", event => { if (event.target === dialog) dialog.close(); });
         document.getElementById("stats-btn").addEventListener("click", () => {
@@ -1050,7 +1099,7 @@ def render_share_controls(storage_key, right_px=84):
     controls_html = r"""
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" onerror="const fallback=document.createElement('script');fallback.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';document.head.appendChild(fallback);"></script>
     <style>
-        :root { --share-accent: oklch(56% 0.2 256); --share-accent-strong: oklch(48% 0.2 256); --share-ink: oklch(98.5% 0.004 250); --share-focus: oklch(18% 0.02 258); --share-shadow: oklch(24% 0.02 258 / 0.18); --share-space-xs: 8px; --ease-out: cubic-bezier(.16,1,.3,1); }
+        :root { --share-accent: #11617b; --share-accent-strong: #0c465c; --share-ink: oklch(98.5% 0.004 250); --share-focus: oklch(60% 0.13 230); --share-shadow: oklch(24% 0.02 258 / 0.18); --share-space-xs: 8px; --ease-out: cubic-bezier(.16,1,.3,1); }
         body { margin: 0; background: transparent; display: flex; gap: var(--share-space-xs); justify-content: center; align-items: center; overflow: hidden; }
         .btn-action { color: var(--share-ink); border: 0; width: 48px; height: 48px; border-radius: 50%; font-size: 19px; cursor: pointer; display: flex; justify-content: center; align-items: center; box-shadow: 0 1px 2px var(--share-shadow); transition: transform 100ms var(--ease-out); }
         .btn-action svg { width: 20px; height: 20px; stroke: currentColor; }
@@ -1162,17 +1211,18 @@ def render_share_controls(storage_key, right_px=84):
         dialog.setAttribute("aria-describedby", "share-picker-description");
         dialog.innerHTML = `
             <style>
-                #share-selection-dialog { --dialog-bg: var(--color-graphite); --dialog-surface: var(--color-graphite-2); --dialog-rule: var(--color-graphite-2); --dialog-ink: var(--color-graphite-ink); --dialog-ink-muted: var(--color-graphite-muted); --dialog-accent: var(--color-accent); --dialog-accent-fill: var(--color-accent); --dialog-accent-strong: var(--color-accent-strong); --dialog-accent-ink: var(--color-accent-ink); --dialog-focus: var(--color-graphite-ink); --dialog-warning: var(--color-warning); --dialog-error: var(--color-danger); --dialog-backdrop: var(--color-overlay); --dialog-shadow: var(--color-shadow); --dialog-font: var(--font-body); position: fixed; inset: 0; width: min(680px, calc(100% - 24px)); height: fit-content; max-height: min(720px, calc(100dvh - 24px)); margin: auto; padding: 0; border: 0; border-radius: var(--radius-card); background: var(--dialog-bg); color: var(--dialog-ink); font-family: var(--dialog-font); box-shadow: 0 1px 2px var(--dialog-shadow); }
+                #share-selection-dialog { color-scheme: dark; --dialog-bg: var(--color-graphite); --dialog-surface: var(--color-graphite-2); --dialog-rule: var(--color-graphite-2); --dialog-ink: var(--color-graphite-ink); --dialog-ink-muted: var(--color-graphite-muted); --dialog-accent: var(--color-accent); --dialog-accent-fill: var(--color-accent); --dialog-accent-strong: var(--color-accent-strong); --dialog-accent-ink: var(--color-accent-ink); --dialog-focus: var(--color-graphite-ink); --dialog-warning: var(--color-warning); --dialog-error: var(--color-danger); --dialog-backdrop: var(--color-overlay); --dialog-shadow: var(--color-shadow); --dialog-font: var(--font-body); position: fixed; inset: 0; width: min(680px, calc(100% - 24px)); height: fit-content; max-height: min(720px, calc(100dvh - 24px)); margin: auto; padding: 0; border: 0; border-radius: var(--radius-card); background: var(--dialog-bg); color: var(--dialog-ink); font-family: var(--dialog-font); box-shadow: 0 1px 2px var(--dialog-shadow); }
                 #share-selection-dialog::backdrop { background: var(--dialog-backdrop); }
-                #share-selection-dialog[open] { animation: share-dialog-in var(--dur-short) var(--ease-out); }
+                #share-selection-dialog[open] { display: flex; flex-direction: column; overflow: hidden; animation: share-dialog-in var(--dur-short) var(--ease-out); }
                 #share-selection-dialog[open]::backdrop { animation: share-backdrop-in var(--dur-short) var(--ease-out); }
                 @keyframes share-dialog-in { from { opacity: 0; transform: translateY(4px); } }
                 @keyframes share-backdrop-in { from { opacity: 0; } }
-                .share-picker-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); padding: var(--space-sm); border-bottom: 1px solid var(--dialog-rule); }
-                .share-picker-head h2 { margin: 0; font-size: 18px; }
+                .share-picker-head { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); padding: var(--space-sm); border-bottom: 1px solid var(--dialog-rule); }
+                .share-picker-head > div { min-width: 0; }
+                .share-picker-head h2 { margin: 0; font-size: 18px; overflow-wrap: anywhere; }
                 .share-picker-head p { display: none; margin: var(--space-2xs) 0 0; color: var(--dialog-ink-muted); font-size: 12px; }
                 .share-picker-close { width: 44px; height: 44px; flex: 0 0 44px; border: 0; border-radius: 50%; background: var(--dialog-rule); color: var(--dialog-ink); cursor: pointer; font-size: 20px; }
-                .share-picker-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); padding: var(--space-sm); overflow: auto; max-height: calc(100dvh - 170px); }
+                .share-picker-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); padding: var(--space-sm); overflow: auto; }
                 .share-picker-section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-sm); }
                 .share-picker-section h3 { margin: 0; font-size: 14px; }
                 .share-picker-actions { display: flex; gap: var(--space-xs); }
@@ -1181,7 +1231,7 @@ def render_share_controls(storage_key, right_px=84):
                 .share-picker-item { min-height: 44px; display: flex; align-items: center; gap: var(--space-xs); padding: var(--space-xs); border-radius: var(--radius-input); cursor: pointer; color: var(--dialog-ink); font-size: 13px; line-height: 1.35; }
                 .share-picker-item:hover { background: var(--dialog-surface); }
                 .share-picker-item input { margin-top: var(--space-3xs); accent-color: var(--dialog-accent-fill); }
-                .share-picker-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); padding: var(--space-sm); border-top: 1px solid var(--dialog-rule); }
+                .share-picker-foot { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); padding: var(--space-sm); border-top: 1px solid var(--dialog-rule); }
                 #share-picker-count { color: var(--dialog-ink-muted); font-size: 12px; }
                 .share-picker-status { min-width: 0; }
                 #share-picker-feedback { display: block; min-height: 1lh; margin-top: var(--space-2xs); color: var(--dialog-ink-muted); font-size: 12px; }
@@ -1196,12 +1246,12 @@ def render_share_controls(storage_key, right_px=84):
                 #share-selection-dialog button:focus-visible, #share-selection-dialog input:focus-visible { outline: 3px solid var(--dialog-focus); outline-offset: 2px; }
                 @media (hover: hover) and (pointer: fine) {
                     .share-picker-close:hover, .share-picker-actions button:hover { background: var(--dialog-surface); }
-                    #share-picker-copy:hover:not(:disabled) { background: var(--dialog-accent-strong); }
+                    #share-picker-copy[data-state="idle"]:hover:not(:disabled) { background: var(--dialog-accent-strong); }
                 }
                 @media (min-width: 40rem) {
                     .share-picker-head { padding: var(--space-md) var(--space-lg) var(--space-sm); }
                     .share-picker-head p { display: block; }
-                    .share-picker-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: var(--space-md) var(--space-lg); max-height: calc(100dvh - 210px); }
+                    .share-picker-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: var(--space-md) var(--space-lg); }
                     .share-picker-foot { padding: var(--space-sm) var(--space-lg) var(--space-md); }
                 }
                 @media (prefers-reduced-motion: reduce) {
@@ -1217,7 +1267,7 @@ def render_share_controls(storage_key, right_px=84):
                     <div class="share-picker-section-head"><h3>Sessions</h3><div class="share-picker-actions"><button aria-label="Select all sessions" data-group="sessions" data-action="all">All</button><button aria-label="Clear all sessions" data-group="sessions" data-action="none">None</button></div></div>
                     <div class="share-picker-list" id="share-session-list"></div>
                     <label for="share-part">Copy group</label>
-                    <select id="share-part" style="width:100%;min-height:44px;color:var(--dialog-ink);background:var(--dialog-bg);border:1px solid var(--dialog-rule);border-radius:8px;padding:8px"></select>
+                    <select id="share-part" style="width:100%;min-height:44px;color:var(--dialog-ink);background:var(--dialog-bg);border:1px solid var(--color-rule-strong);border-radius:8px;padding:8px"></select>
                 </section>
                 <section class="share-picker-section">
                     <div class="share-picker-section-head"><h3>Members</h3><div class="share-picker-actions"><button aria-label="Select all members" data-group="members" data-action="all">All</button><button aria-label="Clear all members" data-group="members" data-action="none">None</button></div></div>
@@ -1323,6 +1373,7 @@ def render_share_controls(storage_key, right_px=84):
         dialog.querySelector(".share-picker-close").addEventListener("click", () => dialog.close());
         dialog.addEventListener("click", event => { if (event.target === dialog) dialog.close(); });
         dialog.addEventListener("close", () => {
+            document.getElementById("share-btn")?.focus();
             shareSnapshot = null;
             dialog.shareSnapshot = null;
         });
@@ -1408,6 +1459,7 @@ def render_share_controls(storage_key, right_px=84):
 
         function normalizeCaptureColors(target, source, background) {
             const colorTokens = [
+                "--color-band", "--color-band-ink", "--color-highlight", "--color-brand-blue",
                 "--color-paper", "--color-paper-2", "--color-paper-3", "--color-ink",
                 "--color-ink-2", "--color-muted", "--color-rule", "--color-rule-strong",
                 "--color-accent", "--color-accent-strong",
@@ -1415,7 +1467,7 @@ def render_share_controls(storage_key, right_px=84):
                 "--color-success-soft", "--color-success-ink",
                 "--color-warning", "--color-warning-soft", "--color-warning-ink",
                 "--color-status-warning-ink", "--color-danger", "--color-danger-soft",
-                "--color-danger-ink", "--color-closed", "--color-graphite",
+                "--color-danger-ink", "--color-danger-text", "--color-closed", "--color-graphite",
                 "--color-graphite-2", "--color-graphite-ink", "--color-graphite-muted",
                 "--color-overlay", "--color-shadow", "--color-surface",
                 "--color-surface-raised", "--color-photo",

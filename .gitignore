@@ -13,10 +13,10 @@ __pycache__/
 # Streamlit
 .streamlit/*
 !.streamlit/secrets.example.toml
+!.streamlit/config.toml
 .runtime_cache/
-
-# Hallmark
-.hallmark
 
 # Local design-skill working files
 scrollcraft/
+.hallmark/
+.impeccable/

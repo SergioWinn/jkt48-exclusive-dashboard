@@ -167,47 +167,49 @@ def _render_dashboard(
 
     if closed and wr_info.get("is_live"):
         source_class = "is-cached"
-        source_label = "FINAL SNAPSHOT"
-        source_detail = "Auto refresh stopped"
-        sync_label = ""
+        source_label = "SALES CLOSED"
+        source_detail = "Updates stopped"
+        sync_label = wr_info.get("time") or "Update time unavailable"
     elif not has_event_detail:
         source_class = "is-unavailable"
-        source_label = "LIST ONLY"
-        source_detail = "Session details unavailable"
-        sync_label = "Waiting for session data"
+        source_label = "DETAILS UNAVAILABLE"
+        source_detail = "Sales closed" if closed else "Retrying automatically"
+        sync_label = "Choose another event or check later"
     elif wr_info.get("is_live"):
-        source_class = "is-live"
-        source_label = "LIVE DATA"
-        source_detail = "Bonus cached" if bonus_cached else "Auto refresh"
-        sync_label = wr_info.get("time") or "Waiting for first sync"
+        source_class = "is-cached" if bonus_cached else "is-live"
+        source_label = "PARTIAL UPDATE" if bonus_cached else "LIVE DATA"
+        source_detail = "Updates automatically"
+        sync_label = wr_info.get("time") or "Waiting for first update"
     else:
         source_class = "is-cached"
         source_label = "CACHED DATA"
-        source_detail = "Last snapshot"
-        sync_label = wr_info.get("time") or "Unknown snapshot time"
+        source_detail = "Sales closed" if closed else "Retrying live updates"
+        sync_label = wr_info.get("time") or "Snapshot time unavailable"
     event_title = escape(str(event_data.get("title", "Event")))
     raw_category = str(event_data.get("category", "-"))
     event_category = escape(CATEGORY_LABELS.get(raw_category, raw_category.replace("_", " ")))
     event_price = int(event_data.get("default_price") or 0)
     sync_markup = f"<small>{escape(str(sync_label))}</small>" if sync_label else ""
-    with st.container(horizontal=True, vertical_alignment="center"):
+    source_description = escape(f"{source_label}. {source_detail}. {sync_label}", quote=True)
+    with st.container(horizontal=True, vertical_alignment="center", key="event_heading"):
         title_slot = st.container()
-        with st.container(horizontal=True, vertical_alignment="center", width="content", gap="small"):
+        with st.container(horizontal=True, vertical_alignment="center", width="content", gap="small", key="event_actions"):
             if is_admin:
                 with st.popover("Tempel JSON", icon=":material/data_object:"):
                     render_json_import(selected_event)
             st.markdown(
-                f'<div class="source-readout {source_class}">'
+                f'<div class="source-readout {source_class}" role="group" aria-label="{source_description}" '
+                f'title="{escape(source_detail, quote=True)}">'
                 f'<strong>{source_label}</strong>'
-                f'<span>{source_detail}</span>{sync_markup}</div>',
+                f'{sync_markup}</div>',
                 unsafe_allow_html=True, width="content",
             )
     title_slot.markdown(
         f"""
         <section class="event-index-head">
             <div>
-                <div class="event-meta">{event_category} · IDR {event_price:,}</div>
                 <h2>{event_title}</h2>
+                <div class="event-meta">{event_category} · IDR {event_price:,}</div>
             </div>
         </section>
         """,
@@ -225,7 +227,7 @@ def _render_dashboard(
     notices = []
 
     if not has_event_detail and not event_closed:
-        notices.append("Data belum tersedia. Mencoba kembali.")
+        notices.append("Session details could not be loaded. Retrying automatically; you can choose another event.")
 
     if notices:
         show_notice = st.warning if not wr_info.get("is_live") or not has_event_detail else st.info
@@ -233,6 +235,8 @@ def _render_dashboard(
 
     if not has_event_detail:
         return
+
+    render_event_cards(event_data, search_query, nickname_map, photo_map, available_only, event_closed)
 
     if sales_data_available:
         st.markdown(
@@ -265,7 +269,6 @@ def _render_dashboard(
             unsafe_allow_html=True,
         )
 
-    render_event_cards(event_data, search_query, nickname_map, photo_map, available_only, event_closed)
     render_stats_payload(
         {
             "Member": table_rows(event_stats["members"]),
@@ -277,12 +280,26 @@ def _render_dashboard(
     )
 
 
+def _has_final_snapshot(selected_event):
+    code = selected_event.get("code")
+    event_data = st.session_state.get(f"event_data_{code}") or {}
+    source = st.session_state.get(f"wr_status_{code}", {})
+    now_wib = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
+    return (
+        isinstance(event_data.get("session"), list)
+        and source.get("is_live", False)
+        and is_event_closed(event_data, now_wib)
+    )
+
+
 @st.fragment(run_every=5)
 def live_dashboard_fragment(*args):
     _render_dashboard(*args)
+    if _has_final_snapshot(args[0]):
+        st.rerun()
 
 
-@st.fragment(run_every=5)
+@st.fragment
 def closed_dashboard_fragment(*args):
     _render_dashboard(*args)
 
@@ -331,7 +348,7 @@ available_categories = category_filters
 
 if available_categories:
     with st.container(border=False, key="event_filters"):
-        col_cat, col_ev, col_search, col_toggle = st.columns(4, vertical_alignment="bottom")
+        col_cat, col_ev, col_search, col_available = st.columns([1, 2, 1.5, 1], vertical_alignment="bottom")
 
         with col_cat:
             selected_cat = st.selectbox(
@@ -350,18 +367,16 @@ if available_categories:
             selected_event = events_by_code[selected_event_code]["data"]
 
         with col_search:
-            global_query = st.text_input("Search member", placeholder="Michie, Gracie…").lower().strip()
+            search_query = st.text_input(
+                "Search member", placeholder="Michie, Gracie…", key="search_member", persist_state="session",
+            ).lower().strip()
+        with col_available:
+            available_only = st.toggle("Available only", value=False, key="available_only", persist_state="session")
 
-        with col_toggle:
-            available_only = st.toggle("Available only", value=False)
-
-    fragment = closed_dashboard_fragment if is_event_closed(
-        selected_event,
-        datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=7),
-    ) else live_dashboard_fragment
+    fragment = closed_dashboard_fragment if _has_final_snapshot(selected_event) else live_dashboard_fragment
     fragment(
         selected_event,
-        global_query,
+        search_query,
         nickname_map,
         photo_map,
         member_metadata,
@@ -375,7 +390,7 @@ if available_categories:
     if is_admin:
         render_share_controls(f"share_selection_{selected_event.get('code', 'unknown')}")
 else:
-    st.error("No active Exclusive events found or failed to fetch data.")
+    st.error("No Exclusive events could be shown. The event list may be empty or temporarily unavailable. Reload the page to try again.")
 
 st.markdown(
     """

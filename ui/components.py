@@ -379,7 +379,7 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
                     stock_label = "Stock remains" if is_available else "No stock remaining"
                 else:
                     stock_label = "Stock unknown"
-                sales_label += f"<br>API:&nbsp;<b>{stock_label}</b>"
+                sales_label = f"<b>{stock_label}</b>"
             combined_ui = f"""
             <div class="c-stats">
                 <span>{sales_label}</span>

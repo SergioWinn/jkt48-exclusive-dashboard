@@ -26,8 +26,9 @@ class EventCardsTest(unittest.TestCase):
                 }]}
                 render_event_cards(event, "", {}, {}, False, is_event_closed=True)
                 html = markdown.call_args.args[0]
-                self.assertIn("Status:&nbsp;<b>CLOSED</b>", html)
-                self.assertIn(f"API:&nbsp;<b>{label}</b>", html)
+                self.assertNotIn("Status:&nbsp;<b>CLOSED</b>", html)
+                self.assertIn(f"<span><b>{label}</b></span>", html)
+                self.assertNotIn("API:&nbsp;", html)
                 self.assertIn('<div class="c-prog-text">CLOSED</div>', html)
                 self.assertNotIn("purchase-card", html)
                 self.assertNotIn("&nbsp;LEFT", html)
@@ -274,7 +275,7 @@ assert.deepEqual(days.map(p => p.values), [['a'], ['b']]);
                 closed_event = {**data, "valid_date_to": "2000-01-01T00:00:00"}
                 render_event_cards(closed_event, "", {}, {}, False)
                 closed_html = markdown.call_args.args[0]
-                self.assertIn("Status:&nbsp;<b>CLOSED</b>", closed_html)
+                self.assertNotIn("Status:&nbsp;<b>CLOSED</b>", closed_html)
                 self.assertNotIn("Status:&nbsp;<b>AVAILABLE</b>", closed_html)
                 self.assertIn('<div class="c-prog-text">CLOSED</div>', closed_html)
                 self.assertNotIn("&nbsp;LEFT", closed_html)
@@ -310,7 +311,7 @@ assert.deepEqual(days.map(p => p.values), [['a'], ['b']]);
                 render_event_cards(data, "", {}, {}, False, is_event_closed=True)
                 closed_html = markdown.call_args.args[0]
                 self.assertIn('<div class="c-prog-text">CLOSED</div>', closed_html)
-                self.assertIn("Status:&nbsp;<b>CLOSED</b>", closed_html)
+                self.assertNotIn("Status:&nbsp;<b>CLOSED</b>", closed_html)
                 self.assertNotIn("purchase-card", closed_html)
 
     @patch("ui.components.st.markdown")
@@ -321,7 +322,7 @@ assert.deepEqual(days.map(p => p.values), [['a'], ['b']]);
         }]}
         render_event_cards(event, "", {}, {}, False)
         html = markdown.call_args.args[0]
-        self.assertIn("Status:&nbsp;<b>CLOSED</b>", html)
+        self.assertNotIn("Status:&nbsp;<b>CLOSED</b>", html)
         self.assertIn('<div class="c-prog-text">CLOSED</div>', html)
         self.assertNotIn("purchase-card", html)
 

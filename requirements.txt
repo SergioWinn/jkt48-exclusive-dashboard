@@ -1,4 +1,6 @@
 streamlit==1.60.0
+# shortcut: Streamlit 1.60 gzip middleware breaks with Starlette >=1.8; revisit when upgrading Streamlit.
+starlette==1.7.0
 requests
 curl-cffi==0.16.3
 playwright==1.63.0

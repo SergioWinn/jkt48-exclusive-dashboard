@@ -374,6 +374,12 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
                                         
             status_label = "CLOSED" if cls == "closed" else "AVAILABLE" if is_available else "SOLD OUT"
             sales_label = f"Status:&nbsp;<b>{status_label}</b>"
+            if cls == "closed":
+                if m.get("quota_available") is not None or m.get("available_quota") is not None:
+                    stock_label = "Stock remains" if is_available else "No stock remaining"
+                else:
+                    stock_label = "Stock unknown"
+                sales_label += f"<br>API:&nbsp;<b>{stock_label}</b>"
             combined_ui = f"""
             <div class="c-stats">
                 <span>{sales_label}</span>

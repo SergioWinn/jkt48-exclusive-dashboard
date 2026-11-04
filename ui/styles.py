@@ -653,7 +653,7 @@ div[class*="st-key-filter_date_"] [role="radiogroup"] label:has(input:checked) [
 .ldp-card.warn { background: var(--color-surface); }
 .ldp-card.sold { background: var(--color-surface); }
 .ldp-card.closed { background: var(--color-paper-2); }
-.ldp-card.closed .c-stats { display: none; }
+.ldp-card.closed .c-stats { white-space: normal; }
 
 .purchase-card:focus-visible,
 .tako-btn:focus-visible {

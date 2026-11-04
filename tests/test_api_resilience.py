@@ -10,6 +10,31 @@ from core import api
 
 
 class ApiResilienceTest(unittest.TestCase):
+    @patch("core.api._set_wr_status")
+    @patch("core.api._write_cache")
+    @patch("core.api._get_json")
+    def test_empty_bonus_preserves_closed_detail_as_successful_snapshot(self, get_json, write, status):
+        for closed in (True, False):
+            with self.subTest(closed=closed):
+                api.clear_exclusive_detail_cache()
+                write.reset_mock()
+                detail = {"code": "EXCLOSED", "sales_period": [{
+                    "label": "General", "end_date": "2000-01-01" if closed else "2099-01-01",
+                }], "session": [{"session_detail": [
+                    {"jkt48_member_name": "A", "quota_available": True},
+                    {"jkt48_member_name": "B", "quota_available": False},
+                ]}]}
+                get_json.side_effect = [{"status": True, "data": detail},
+                                        {"status": True, "data": []}]
+                self.assertEqual(api.fetch_exclusive_detail("EXCLOSED"), detail)
+                self.assertTrue(status.call_args.args[1])
+                if closed:
+                    self.assertEqual(status.call_args.args[3], "")
+                    self.assertEqual(write.call_args.args[1]["data"], detail)
+                else:
+                    self.assertIn("Bonus:", status.call_args.args[3])
+                    write.assert_not_called()
+
     def setUp(self):
         browser = patch("core.browser_fetch.fetch_event_json", return_value={})
         browser.start()

@@ -6,6 +6,7 @@ import tempfile
 from datetime import datetime, timedelta, timezone
 
 import streamlit as st
+from core.refresh import is_event_closed
 
 try:
     from curl_cffi import requests as browser_requests
@@ -519,9 +520,13 @@ def _fetch_exclusive_detail_shared(code):
             bonus = browser_payloads.get("bonus")
             if not isinstance(bonus, dict) or bonus.get("status") is not True:
                 raise
-        data = _apply_bonus_stock(data or {"code": code}, bonus.get("data"))
-        print(f"[sync] event={code} bonus=OK", flush=True)
-        is_live, reason, time_label = True, "", waktu_sekarang
+        if (bonus.get("data") == [] and is_live and data
+                and isinstance(data.get("session"), list) and is_event_closed(data, now_wib)):
+            print(f"[sync] event={code} bonus=EMPTY sales=CLOSED source=DETAIL", flush=True)
+        else:
+            data = _apply_bonus_stock(data or {"code": code}, bonus.get("data"))
+            print(f"[sync] event={code} bonus=OK", flush=True)
+            is_live, reason, time_label = True, "", waktu_sekarang
     except LiveApiUnavailable as error:
         print(f"[sync] event={code} bonus=FAILED reason={_sync_error_label(error)}", flush=True)
         reason = f"{reason}; bonus: {error}" if reason else f"Bonus: {error}"

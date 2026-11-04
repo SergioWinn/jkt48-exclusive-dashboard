@@ -13,6 +13,26 @@ from ui.styles import GLOBAL_CSS
 
 class EventCardsTest(unittest.TestCase):
     @patch("ui.components.st.markdown")
+    def test_closed_cards_show_detail_availability_without_purchase_links(self, markdown):
+        for available, label in ((True, "Stock remains"), (False, "No stock remaining"),
+                                 (None, "Stock unknown")):
+            with self.subTest(available=available):
+                member = {"jkt48_member_name": "Member"}
+                if available is not None:
+                    member["quota_available"] = available
+                event = {"code": "EXCLOSED", "session": [{
+                    "date": "2099-01-01", "label": "Sesi 1", "start_time": "11:00",
+                    "session_detail": [member],
+                }]}
+                render_event_cards(event, "", {}, {}, False, is_event_closed=True)
+                html = markdown.call_args.args[0]
+                self.assertIn("Status:&nbsp;<b>CLOSED</b>", html)
+                self.assertIn(f"API:&nbsp;<b>{label}</b>", html)
+                self.assertIn('<div class="c-prog-text">CLOSED</div>', html)
+                self.assertNotIn("purchase-card", html)
+                self.assertNotIn("&nbsp;LEFT", html)
+
+    @patch("ui.components.st.markdown")
     def test_binary_bonus_does_not_expose_stale_counts_from_other_slots(self, markdown):
         session = {"date": "2099-09-13", "start_time": "11:00", "label": "Sesi 1"}
         event = {"code": "EXBINARY", "session": [{**session, "session_detail": [

@@ -8,7 +8,8 @@ This project is built as an operational tracker: it polls public event data, fal
 
 - Live JKT48 Global Exclusive event and session monitoring.
 - Category, event, member search, date, and availability filters.
-- Event-level totals: total tickets, sold, remaining, sold rate, captured revenue, and potential revenue.
+- Availability-only responses (all 0/1) show AVAILABLE / SOLD OUT, without remaining counts or sales estimates. This conservative rule also applies to old snapshots containing only 0/1.
+- Event-level totals and sales statistics appear only when quantity and sold data are available. Live availability is never replaced with older cached stock after a bonus request fails.
 - Member, generation, and team ranking statistics.
 - Responsive statistics dialog with compact mobile member cards.
 - Admin-only image capture for dashboard cards and statistics rankings.

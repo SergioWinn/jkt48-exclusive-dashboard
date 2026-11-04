@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
 from core.refresh import get_sales_window
+from core.stats import has_quantity_data
 
 
 def install_motion_observer():
@@ -109,6 +110,7 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
     
     warn_limit = 5 if category in ["TWO_SHOT", "DIGITAL_PHOTOBOOK"] else 20
     sessions = event_data.get('session', [])
+    quantity_data = has_quantity_data(event_data)
     
     if not sessions:
         st.info("No sessions are listed for this event yet. Choose another event or check again later.")
@@ -308,7 +310,7 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
         for m in members:
             member_name = str(m.get('jkt48_member_name') or 'Unknown')
             current_quota = _as_int(m.get('available_quota'))
-            has_remaining = m.get('available_quota') is not None
+            has_remaining = quantity_data and m.get('available_quota') is not None
             is_available = _is_available(m)
             jalur_label = str(m.get("label", "-"))
             jalur_title = jalur_label
@@ -348,8 +350,10 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
                 cls = "avail"
             if cls == "closed":
                 btn_text = "CLOSED"
+            elif not has_remaining:
+                btn_text = "AVAILABLE" if is_available else "SOLD OUT"
             else:
-                btn_text = f"{current_quota if has_remaining else '&mdash;'}&nbsp;LEFT"
+                btn_text = f"{current_quota}&nbsp;LEFT"
 
             safe_name_img = member_name.strip().lower()
             raw_photo_value = photo_map.get(safe_name_img)

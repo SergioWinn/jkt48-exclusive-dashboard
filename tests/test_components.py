@@ -12,6 +12,24 @@ from ui.styles import GLOBAL_CSS
 
 
 class EventCardsTest(unittest.TestCase):
+    @patch("ui.components.st.markdown")
+    def test_binary_bonus_does_not_expose_stale_counts_from_other_slots(self, markdown):
+        session = {"date": "2099-09-13", "start_time": "11:00", "label": "Sesi 1"}
+        event = {"code": "EXBINARY", "session": [{**session, "session_detail": [
+            {"label": "1", "jkt48_member_name": "A", "available_quota": 30, "tickets_sold": 10},
+            {"label": "2", "jkt48_member_name": "B", "available_quota": 20, "tickets_sold": 20},
+        ]}]}
+        updated = _apply_bonus_stock(event, [{**session, "session_members": [
+            {"label": "1", "member_name": "A", "available_quota": 1},
+        ]}])
+        render_event_cards(updated, "", {}, {}, False)
+        html = markdown.call_args.args[0]
+        self.assertNotIn("&nbsp;LEFT", html)
+        self.assertNotIn("purchase-card warn", html)
+        self.assertIn('<div class="c-prog-text">AVAILABLE</div>', html)
+        self.assertFalse(calculate_event_stats(updated)["sales_data_available"])
+        self.assertEqual(event["session"][0]["session_detail"][0]["available_quota"], 30)
+
     @unittest.skipUnless(shutil.which("node"), "Node is needed to check statistics feedback")
     @patch("ui.components.st.iframe")
     def test_statistics_copy_feedback_covers_all_states(self, iframe):
@@ -212,7 +230,7 @@ assert.deepEqual(days.map(p => p.values), [['a'], ['b']]);
             **session, "session_detail": [{"label": "Jalur 1", "jkt48_member_name": "Jacqueline Immanuela",
                                           "quota_available": True}],
         }]}
-        for quota in (9, 3, 0, None):
+        for quota in (9, 3, 1, 0, None):
             with self.subTest(quota=quota):
                 data = event if quota is None else _apply_bonus_stock(event, [{
                     **session, "session_members": [{"label": "Jalur 1", "member_name": "Jacqueline Immanuela",
@@ -224,11 +242,14 @@ assert.deepEqual(days.map(p => p.values), [['a'], ['b']]);
                 if quota is None:
                     self.assertIn("Status:&nbsp;<b>AVAILABLE</b>", html)
                     self.assertNotIn("0 remaining", html)
-                    self.assertIn("&mdash;&nbsp;LEFT", html)
+                    self.assertNotIn("&nbsp;LEFT", html)
                 else:
                     self.assertIn(f"Status:&nbsp;<b>{'AVAILABLE' if quota else 'SOLD OUT'}</b>", html)
                     self.assertNotIn("Remaining:&nbsp;", html)
-                    self.assertIn(f"{quota}&nbsp;LEFT", html)
+                    if quota > 1:
+                        self.assertIn(f"{quota}&nbsp;LEFT", html)
+                    else:
+                        self.assertNotIn("&nbsp;LEFT", html)
                     self.assertNotIn("SOLD&nbsp;OUT", html)
                 closed_event = {**data, "valid_date_to": "2000-01-01T00:00:00"}
                 render_event_cards(closed_event, "", {}, {}, False)
@@ -255,7 +276,10 @@ assert.deepEqual(days.map(p => p.values), [['a'], ['b']]);
                 render_event_cards(data, "", {}, {}, False)
                 html = markdown.call_args.args[0]
                 self.assertIn(f"Status:&nbsp;<b>{'AVAILABLE' if quota else 'SOLD OUT'}</b>", html)
-                self.assertIn(f"{quota}&nbsp;LEFT", html)
+                if quota > 1:
+                    self.assertIn(f"{quota}&nbsp;LEFT", html)
+                else:
+                    self.assertNotIn("&nbsp;LEFT", html)
                 self.assertNotIn("Remaining:&nbsp;", html)
                 self.assertNotIn("Sold:&nbsp;", html)
                 self.assertNotIn("c-prog-fill", html)

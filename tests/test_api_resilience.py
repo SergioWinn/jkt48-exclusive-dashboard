@@ -130,7 +130,7 @@ class ApiResilienceTest(unittest.TestCase):
         api.clear_exclusive_detail_cache()
         live = {"code": "EXPARTIAL", "title": "New title", "session": [{
             "date": "2099-01-01", "start_time": "11:00", "session_detail": [{
-                "label": "1", "jkt48_member_name": "Member",
+                "label": "1", "jkt48_member_name": "Member", "quota_available": False,
             }],
         }]}
         cached = {**live, "title": "Old title", "session": [{
@@ -143,7 +143,8 @@ class ApiResilienceTest(unittest.TestCase):
         browser.return_value = {}
         result = api.fetch_exclusive_detail("EXPARTIAL")
         self.assertEqual(result["title"], "New title")
-        self.assertEqual(result["session"][0]["session_detail"][0]["available_quota"], 7)
+        self.assertNotIn("available_quota", result["session"][0]["session_detail"][0])
+        self.assertFalse(result["session"][0]["session_detail"][0]["quota_available"])
         self.assertTrue(status.call_args.args[1])
         self.assertIn("Bonus:", status.call_args.args[3])
         write.assert_not_called()

@@ -89,6 +89,14 @@ def _ranked_buckets(buckets):
     return ranked
 
 
+def has_quantity_data(event):
+    # shortcut: all-0/1 payloads are ambiguous; show status until the API declares quantity semantics.
+    return not event.get("availability_only", False) and any(
+        type(member.get("available_quota")) is int and member["available_quota"] > 1
+        for session in event.get("session", []) for member in session.get("session_detail", [])
+    )
+
+
 def calculate_event_stats(event, member_metadata=None):
     member_metadata = member_metadata or {}
     price = _as_int(event.get("default_price"))
@@ -97,14 +105,15 @@ def calculate_event_stats(event, member_metadata=None):
     by_generation = {}
     by_team = {}
     details = [detail for session in event.get("session", []) for detail in session.get("session_detail", [])]
-    sales_data_available = bool(details) and all(
+    quantity_data = has_quantity_data(event)
+    sales_data_available = quantity_data and bool(details) and all(
         "tickets_sold" in detail and "available_quota" in detail for detail in details
     )
 
     for detail in details:
         member_name = str(detail.get("jkt48_member_name") or "Unknown").strip() or "Unknown"
-        sold = _as_int(detail.get("tickets_sold"))
-        remaining = _as_int(detail.get("available_quota"))
+        sold = _as_int(detail.get("tickets_sold")) if quantity_data else 0
+        remaining = _as_int(detail.get("available_quota")) if quantity_data else 0
         metadata = member_metadata.get(_key(member_name), {})
         generation = metadata.get("generation") or "Unknown"
         team = metadata.get("status") or "Unknown"

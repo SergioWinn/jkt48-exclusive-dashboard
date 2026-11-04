@@ -432,6 +432,7 @@ def _apply_bonus_stock(data, bonus_sessions):
         for session in data.get("session", [])
     }
     has_stock = False
+    availability_only = True
     for session in bonus_sessions:
         if not isinstance(session, dict) or not isinstance(session.get("session_members"), list):
             raise LiveApiUnavailable("Invalid bonus session")
@@ -449,6 +450,7 @@ def _apply_bonus_stock(data, bonus_sessions):
             if not all(isinstance(value, str) and value for value in identity) or type(quota) is not int or quota < 0:
                 raise LiveApiUnavailable("Invalid bonus stock")
             has_stock = True
+            availability_only = availability_only and quota in (0, 1)
             members[identity] = {
                 **members.get(identity, {}), **member,
                 "jkt48_member_name": member["member_name"], "quota_available": quota > 0,
@@ -459,28 +461,7 @@ def _apply_bonus_stock(data, bonus_sessions):
         }
     if not has_stock:
         raise LiveApiUnavailable("Bonus stock is empty")
-    return {**data, "session": list(sessions.values())}
-
-
-def _apply_cached_stock(data, cached_data):
-    bonus_sessions = []
-    for session in cached_data.get("session", []) if isinstance(cached_data, dict) else []:
-        members = [
-            {
-                "label": member.get("label"),
-                "member_name": member.get("jkt48_member_name"),
-                "available_quota": member.get("available_quota"),
-            }
-            for member in session.get("session_detail", [])
-            if isinstance(member, dict) and "available_quota" in member
-        ]
-        if members:
-            bonus_sessions.append({
-                "date": session.get("date"),
-                "start_time": session.get("start_time"),
-                "session_members": members,
-            })
-    return _apply_bonus_stock(data, bonus_sessions)
+    return {**data, "session": list(sessions.values()), "availability_only": availability_only}
 
 
 def _sync_error_label(error):
@@ -544,13 +525,6 @@ def _fetch_exclusive_detail_shared(code):
     except LiveApiUnavailable as error:
         print(f"[sync] event={code} bonus=FAILED reason={_sync_error_label(error)}", flush=True)
         reason = f"{reason}; bonus: {error}" if reason else f"Bonus: {error}"
-        if is_live:
-            cache_payload = _read_latest_cache(cache_file, bundled_cache_file)
-            try:
-                data = _apply_cached_stock(data, cache_payload.get("data"))
-                print(f"[sync] event={code} bonus=CACHED snapshot={cache_payload.get('last_updated', 'Unknown')}", flush=True)
-            except (AttributeError, LiveApiUnavailable):
-                pass
     if is_live and not reason:
         _write_cache(cache_file, {"last_updated": time_label, "data": data})
     return {"data": data, "is_live": is_live, "reason": reason, "time": time_label}

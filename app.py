@@ -13,7 +13,7 @@ from core.api import (
     get_member_database,
 )
 from core.refresh import get_detail_refresh_interval, is_event_closed
-from core.stats import calculate_event_stats, format_rupiah, load_member_metadata, table_rows
+from core.stats import calculate_event_stats, format_rupiah, has_quantity_data, load_member_metadata, table_rows
 from ui.styles import GLOBAL_CSS
 from ui.components import render_event_cards, render_share_controls, render_stats_controls, render_stats_payload
 
@@ -85,7 +85,7 @@ def render_json_import(selected_event):
             <section class="json-import-head">
                 <span>ADMIN SNAPSHOT · {escape(code)}</span>
                 <h3>Perbarui data cadangan</h3>
-                <p>Tempel respons API lengkap. Detail wajib; bonus menambahkan angka stok terbaru.</p>
+                <p>Tempel respons API lengkap. Detail wajib; bonus memperbarui ketersediaan tiket.</p>
             </section>
             """,
             unsafe_allow_html=True,
@@ -228,6 +228,8 @@ def _render_dashboard(
 
     if not has_event_detail and not event_closed:
         notices.append("Session details could not be loaded. Retrying automatically; you can choose another event.")
+    elif has_event_detail and not has_quantity_data(event_data):
+        notices.append("Availability only. Exact ticket counts and sales statistics are unavailable.")
 
     if notices:
         show_notice = st.warning if not wr_info.get("is_live") or not has_event_detail else st.info

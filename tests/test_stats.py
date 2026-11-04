@@ -91,6 +91,16 @@ class EventStatsTest(unittest.TestCase):
 
         self.assertFalse(stats["sales_data_available"])
 
+    def test_binary_cached_counts_do_not_become_sales_statistics(self):
+        event = {"default_price": 200000, "session": [{"session_detail": [
+            {"jkt48_member_name": "A", "available_quota": 0, "tickets_sold": 20},
+            {"jkt48_member_name": "B", "available_quota": 1, "tickets_sold": 10},
+        ]}]}
+        stats = calculate_event_stats(event)
+        self.assertFalse(stats["sales_data_available"])
+        self.assertEqual(stats["summary"]["revenue"], 0)
+        self.assertEqual(stats["summary"]["remaining"], 0)
+
     def test_table_rows_format_money_percentage_and_members(self):
         rows = table_rows([
             {

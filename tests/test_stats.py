@@ -84,6 +84,15 @@ class EventStatsTest(unittest.TestCase):
         self.assertEqual(stats["generations"][0]["name"], "Unknown")
         self.assertEqual(stats["teams"][0]["name"], "Unknown")
 
+    def test_capped_video_call_stock_hides_exact_sales_statistics(self):
+        event = {"category": "DIGITAL_PHOTOBOOK", "default_price": 100000,
+                 "session": [{"session_detail": [
+                     {"jkt48_member_name": "A", "tickets_sold": 10, "available_quota": 5},
+                 ]}]}
+        self.assertFalse(calculate_event_stats(event)["sales_data_available"])
+        event["session"][0]["session_detail"][0]["available_quota"] = 4
+        self.assertTrue(calculate_event_stats(event)["sales_data_available"])
+
     def test_availability_only_api_does_not_claim_zero_sales(self):
         stats = calculate_event_stats({
             "session": [{"session_detail": [{"jkt48_member_name": "A", "quota_available": False}]}],

@@ -261,11 +261,12 @@ assert.deepEqual(days.map(p => p.values), [['a'], ['b']]);
                 html = markdown.call_args.args[0]
                 self.assertNotIn("Sold:&nbsp;", html)
                 if quota is None:
-                    self.assertIn("Status:&nbsp;<b>AVAILABLE</b>", html)
+                    self.assertIn('<div class="c-prog-text">AVAILABLE</div>', html)
                     self.assertNotIn("0 remaining", html)
                     self.assertNotIn("&nbsp;LEFT", html)
                 else:
-                    self.assertIn(f"Status:&nbsp;<b>{'AVAILABLE' if quota else 'SOLD OUT'}</b>", html)
+                    status = "SOLD OUT" if quota == 0 else "LOW" if quota == 3 else "AVAILABLE"
+                    self.assertIn(f'<div class="c-prog-text">{status}</div>', html)
                     self.assertNotIn("Remaining:&nbsp;", html)
                     if quota > 1:
                         self.assertIn(f"{quota}&nbsp;LEFT", html)
@@ -288,7 +289,7 @@ assert.deepEqual(days.map(p => p.values), [['a'], ['b']]);
                  "session": [{**session, "session_detail": [
                      {"label": "Jalur 1", "jkt48_member_name": "Jacqueline Immanuela"},
                  ]}]}
-        for quota in (0, 9, 45, 46):
+        for quota in (0, 1, 2, 3, 4, 5, 9, 45, 46):
             with self.subTest(quota=quota):
                 bonus = [{**session, "session_members": [
                     {"label": "Jalur 1", "member_name": "Jacqueline Immanuela", "available_quota": quota},
@@ -296,11 +297,13 @@ assert.deepEqual(days.map(p => p.values), [['a'], ['b']]);
                 data = _apply_bonus_stock(event, bonus)
                 render_event_cards(data, "", {}, {}, False)
                 html = markdown.call_args.args[0]
-                self.assertIn(f"Status:&nbsp;<b>{'AVAILABLE' if quota else 'SOLD OUT'}</b>", html)
-                if quota > 1:
-                    self.assertIn(f"{quota}&nbsp;LEFT", html)
-                else:
-                    self.assertNotIn("&nbsp;LEFT", html)
+                status = "SOLD OUT" if quota == 0 else "LOW" if quota < 5 else "AVAILABLE"
+                self.assertIn(f'<div class="c-prog-text">{status}</div>', html)
+                label = "5+" if quota == 5 else str(quota)
+                self.assertIn(f"<span><b>{label}&nbsp;LEFT</b></span>", html)
+                self.assertNotIn("Status:&nbsp;", html)
+                if quota:
+                    self.assertIn(f"{label} remaining", html)
                 self.assertNotIn("Remaining:&nbsp;", html)
                 self.assertNotIn("Sold:&nbsp;", html)
                 self.assertNotIn("c-prog-fill", html)

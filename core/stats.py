@@ -90,6 +90,11 @@ def _ranked_buckets(buckets):
 
 
 def has_quantity_data(event):
+    if event.get("category") == "DIGITAL_PHOTOBOOK":
+        return any(
+            type(member.get("available_quota")) is int
+            for session in event.get("session", []) for member in session.get("session_detail", [])
+        )
     # shortcut: all-0/1 payloads are ambiguous; show status until the API declares quantity semantics.
     return not event.get("availability_only", False) and any(
         type(member.get("available_quota")) is int and member["available_quota"] > 1
@@ -106,7 +111,10 @@ def calculate_event_stats(event, member_metadata=None):
     by_team = {}
     details = [detail for session in event.get("session", []) for detail in session.get("session_detail", [])]
     quantity_data = has_quantity_data(event)
-    sales_data_available = quantity_data and bool(details) and all(
+    capped_stock = event.get("category") == "DIGITAL_PHOTOBOOK" and any(
+        detail.get("available_quota") == 5 for detail in details
+    )
+    sales_data_available = quantity_data and not capped_stock and bool(details) and all(
         "tickets_sold" in detail and "available_quota" in detail for detail in details
     )
 

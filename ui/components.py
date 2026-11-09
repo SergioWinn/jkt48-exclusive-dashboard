@@ -311,6 +311,7 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
             member_name = str(m.get('jkt48_member_name') or 'Unknown')
             current_quota = _as_int(m.get('available_quota'))
             has_remaining = quantity_data and m.get('available_quota') is not None
+            quota_label = '5+' if category == 'DIGITAL_PHOTOBOOK' and current_quota == 5 else str(current_quota)
             is_available = _is_available(m)
             jalur_label = str(m.get("label", "-"))
             jalur_title = jalur_label
@@ -348,12 +349,7 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
                 cls = "warn"
             else:
                 cls = "avail"
-            if cls == "closed":
-                btn_text = "CLOSED"
-            elif not has_remaining:
-                btn_text = "AVAILABLE" if is_available else "SOLD OUT"
-            else:
-                btn_text = f"{current_quota}&nbsp;LEFT"
+            btn_text = {"closed": "CLOSED", "sold": "SOLD OUT", "warn": "LOW", "avail": "AVAILABLE"}[cls]
 
             safe_name_img = member_name.strip().lower()
             raw_photo_value = photo_map.get(safe_name_img)
@@ -372,8 +368,7 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
                 initials = ''.join(part[0] for part in member_name.split()[:2]).upper() or '?'
                 img_html = f'<div class="c-photo c-photo-placeholder" aria-hidden="true">{escape(initials)}</div>'
                                         
-            status_label = "CLOSED" if cls == "closed" else "AVAILABLE" if is_available else "SOLD OUT"
-            sales_label = f"Status:&nbsp;<b>{status_label}</b>"
+            sales_label = f"<b>{quota_label}&nbsp;LEFT</b>" if has_remaining else ""
             if cls == "closed":
                 if m.get("quota_available") is not None or m.get("available_quota") is not None:
                     stock_label = "Stock remains" if is_available else "No stock remaining"
@@ -408,7 +403,7 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
             else: 
                 purchase_aria = escape(
                     f"Purchase ticket for {member_name}, {sesi_label}, "
-                    f"{str(current_quota) + ' remaining' if has_remaining else 'available'}; opens in a new tab",
+                    f"{quota_label + ' remaining' if has_remaining else 'available'}; opens in a new tab",
                     quote=True,
                 )
                 card_html += (

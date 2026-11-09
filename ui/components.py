@@ -368,7 +368,7 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
                 initials = ''.join(part[0] for part in member_name.split()[:2]).upper() or '?'
                 img_html = f'<div class="c-photo c-photo-placeholder" aria-hidden="true">{escape(initials)}</div>'
                                         
-            sales_label = f"<b>{quota_label}&nbsp;LEFT</b>" if has_remaining else ""
+            sales_label = f"<b>{quota_label}&nbsp;LEFT</b>" if cls == "warn" else ""
             if cls == "closed":
                 if m.get("quota_available") is not None or m.get("available_quota") is not None:
                     stock_label = "Stock remains" if is_available else "No stock remaining"

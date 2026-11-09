@@ -268,7 +268,7 @@ assert.deepEqual(days.map(p => p.values), [['a'], ['b']]);
                     status = "SOLD OUT" if quota == 0 else "LOW" if quota == 3 else "AVAILABLE"
                     self.assertIn(f'<div class="c-prog-text">{status}</div>', html)
                     self.assertNotIn("Remaining:&nbsp;", html)
-                    if quota > 1:
+                    if status == "LOW":
                         self.assertIn(f"{quota}&nbsp;LEFT", html)
                     else:
                         self.assertNotIn("&nbsp;LEFT", html)
@@ -300,7 +300,10 @@ assert.deepEqual(days.map(p => p.values), [['a'], ['b']]);
                 status = "SOLD OUT" if quota == 0 else "LOW" if quota < 5 else "AVAILABLE"
                 self.assertIn(f'<div class="c-prog-text">{status}</div>', html)
                 label = "5+" if quota == 5 else str(quota)
-                self.assertIn(f"<span><b>{label}&nbsp;LEFT</b></span>", html)
+                if status == "LOW":
+                    self.assertIn(f"<span><b>{label}&nbsp;LEFT</b></span>", html)
+                else:
+                    self.assertNotIn("&nbsp;LEFT", html)
                 self.assertNotIn("Status:&nbsp;", html)
                 if quota:
                     self.assertIn(f"{label} remaining", html)

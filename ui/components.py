@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
 from core.refresh import get_sales_window
-from core.stats import has_quantity_data
+from core.stats import STOCK_DISPLAY_CAPS, has_quantity_data
 
 
 def install_motion_observer():
@@ -324,7 +324,8 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
             member_name = str(m.get('jkt48_member_name') or 'Unknown')
             current_quota = _as_int(m.get('available_quota'))
             has_remaining = quantity_data and m.get('available_quota') is not None
-            quota_label = '5+' if category == 'DIGITAL_PHOTOBOOK' and current_quota == 5 else str(current_quota)
+            stock_cap = STOCK_DISPLAY_CAPS.get(category)
+            quota_label = f'{stock_cap}+' if stock_cap is not None and current_quota == stock_cap else str(current_quota)
             is_available = _is_available(m)
             jalur_label = str(m.get("label", "-"))
             jalur_title = jalur_label

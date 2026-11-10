@@ -512,7 +512,10 @@ def _fetch_exclusive_detail_shared(code):
     try:
         bonus_url = f"https://jkt48.com/api/v1/exclusives/{code}/bonus?lang=id"
         try:
-            bonus = _get_json(bonus_url, 12)
+            bonus = (browser_payloads or {}).get("bonus")
+            if not (isinstance(bonus, dict) and bonus.get("status") is True
+                    and isinstance(bonus.get("data"), list)):
+                bonus = _get_json(bonus_url, 12)
         except LiveApiUnavailable:
             from core.browser_fetch import fetch_event_json
 

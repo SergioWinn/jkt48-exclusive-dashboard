@@ -2,6 +2,9 @@ import csv
 from pathlib import Path
 
 
+STOCK_DISPLAY_CAPS = {"DIGITAL_PHOTOBOOK": 5, "PHOTOCARD": 20}
+
+
 PROJECT_ROOT = Path(__file__).parent.parent
 MEMBER_METADATA_FILE = PROJECT_ROOT / "data" / "member_metadata.csv"
 
@@ -90,7 +93,7 @@ def _ranked_buckets(buckets):
 
 
 def has_quantity_data(event):
-    if event.get("category") == "DIGITAL_PHOTOBOOK":
+    if event.get("category") in STOCK_DISPLAY_CAPS:
         return any(
             type(member.get("available_quota")) is int
             for session in event.get("session", []) for member in session.get("session_detail", [])
@@ -111,8 +114,9 @@ def calculate_event_stats(event, member_metadata=None):
     by_team = {}
     details = [detail for session in event.get("session", []) for detail in session.get("session_detail", [])]
     quantity_data = has_quantity_data(event)
-    capped_stock = event.get("category") == "DIGITAL_PHOTOBOOK" and any(
-        detail.get("available_quota") == 5 for detail in details
+    stock_cap = STOCK_DISPLAY_CAPS.get(event.get("category"))
+    capped_stock = stock_cap is not None and any(
+        detail.get("available_quota") == stock_cap for detail in details
     )
     sales_data_available = quantity_data and not capped_stock and bool(details) and all(
         "tickets_sold" in detail and "available_quota" in detail for detail in details

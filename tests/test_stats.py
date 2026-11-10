@@ -93,6 +93,16 @@ class EventStatsTest(unittest.TestCase):
         event["session"][0]["session_detail"][0]["available_quota"] = 4
         self.assertTrue(calculate_event_stats(event)["sales_data_available"])
 
+    def test_capped_meet_greet_stock_does_not_claim_exact_totals(self):
+        event = {"category": "PHOTOCARD", "availability_only": True,
+                 "session": [{"session_detail": [{"jkt48_member_name": "A", "tickets_sold": 10,
+                                                   "available_quota": 20}]}]}
+        self.assertFalse(calculate_event_stats(event)["sales_data_available"])
+        event["session"][0]["session_detail"][0]["available_quota"] = 1
+        stats = calculate_event_stats(event)
+        self.assertEqual(stats["summary"]["remaining"], 1)
+        self.assertTrue(stats["sales_data_available"])
+
     def test_availability_only_api_does_not_claim_zero_sales(self):
         stats = calculate_event_stats({
             "session": [{"session_detail": [{"jkt48_member_name": "A", "quota_available": False}]}],

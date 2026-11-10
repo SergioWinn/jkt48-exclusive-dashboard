@@ -382,6 +382,25 @@ assert.deepEqual(days.map(p => p.values), [['a'], ['b']]);
                 self.assertNotIn("purchase-card", closed_html)
 
     @patch("ui.components.st.markdown")
+    def test_low_boundaries_by_event_category(self, markdown):
+        for category, cap in (("DIGITAL_PHOTOBOOK", 5), ("PHOTOCARD", 20), ("TWO_SHOT", 1)):
+            for quota in sorted({0, 1, cap - 1, cap}):
+                with self.subTest(category=category, quota=quota):
+                    event = {"code": "EXLOW", "category": category, "availability_only": quota <= 1,
+                             "session": [{"date": "2099-01-01", "start_time": "11:00", "label": "Session 1",
+                                          "session_detail": [{"jkt48_member_name": "Member", "available_quota": quota}]}]}
+                    render_event_cards(event, "", {}, {}, False)
+                    html = markdown.call_args.args[0]
+                    status = "SOLD OUT" if quota == 0 else "LOW" if quota < cap else "AVAILABLE"
+                    self.assertIn(f'<div class="c-prog-text">{status}</div>', html)
+                    if status == "LOW":
+                        self.assertIn(f"{quota}&nbsp;LEFT", html)
+                    else:
+                        self.assertNotIn("&nbsp;LEFT", html)
+                    if quota == cap and cap > 1:
+                        self.assertIn(f"{cap}+ remaining", html)
+
+    @patch("ui.components.st.markdown")
     def test_expired_session_is_closed_even_when_stock_remains(self, markdown):
         event = {"code": "EXPAST", "valid_date_to": "2099-01-01T23:00:00", "session": [{
             "date": "2000-01-01", "label": "Session 1", "start_time": "12:00:00",

@@ -200,9 +200,31 @@ class ApiResilienceTest(unittest.TestCase):
         }
         result = api.fetch_exclusive_detail("EXBROWSER")
         self.assertEqual(result["session"][0]["session_detail"][0]["available_quota"], 2)
+        get_json.assert_called_once_with("https://jkt48.com/api/v1/exclusives/EXBROWSER?lang=id", 12)
         browser.assert_called_once_with("EXBROWSER", 12)
         self.assertTrue(status.call_args.args[1])
         write.assert_called_once()
+
+    @patch("core.api._set_wr_status")
+    @patch("core.api._write_cache")
+    @patch("core.browser_fetch.fetch_event_json")
+    @patch("core.api._get_json")
+    def test_browser_bonus_reuse_keeps_http_recovery_and_closed_empty_data(self, get_json, browser, write, status):
+        detail = {"code": "EXREUSE", "valid_date_to": "2000-01-01", "session": []}
+        for bonus in (None, {}, {"status": False, "data": []}, {"status": True, "data": None},
+                      {"status": True, "data": []}):
+            with self.subTest(bonus=bonus):
+                api.clear_exclusive_detail_cache()
+                get_json.reset_mock()
+                browser.reset_mock()
+                get_json.side_effect = [api.LiveApiUnavailable("Cloudflare challenge"),
+                                        {"status": True, "data": []}]
+                browser.return_value = {"detail": {"status": True, "data": detail}, "bonus": bonus}
+                self.assertEqual(api.fetch_exclusive_detail("EXREUSE"), detail)
+                self.assertEqual(get_json.call_count, 1 if bonus == {"status": True, "data": []} else 2)
+                browser.assert_called_once()
+                self.assertTrue(status.call_args.args[1])
+                self.assertEqual(status.call_args.args[3], "")
 
     def tearDown(self):
         api.get_active_exclusive_events.clear()

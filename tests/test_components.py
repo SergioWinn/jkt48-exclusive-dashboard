@@ -13,6 +13,67 @@ from ui.styles import GLOBAL_CSS
 
 class EventCardsTest(unittest.TestCase):
     @patch("ui.components.st.markdown")
+    def test_purchase_labels_identify_date_time_lane_and_low_stock(self, markdown):
+        name = 'Member <One> & "Two"'
+        event = {"code": "EXLABEL", "category": "DIGITAL_PHOTOBOOK", "session": [
+            {"date": date, "start_time": "11:00:00", "end_time": "12:00:00", "label": "Sesi 1",
+             "session_detail": [{"label": "Jalur 2", "jkt48_member_name": name, "available_quota": 3}]}
+            for date in ("2099-01-01", "2099-01-02")
+        ]}
+        render_event_cards(event, "member", {}, {name.lower(): "https://example.com/missing.jpg"}, False)
+        html = markdown.call_args.args[0]
+        for date in ("01/01/2099", "02/01/2099"):
+            self.assertIn(f"{date}, Session 1, 11:00 - 12:00, Jalur 2, LOW, 3 remaining", html)
+        self.assertIn("Member &lt;One&gt; &amp; &quot;Two&quot;", html)
+        self.assertIn('<span class="c-photo-placeholder">M&lt;</span>', html)
+
+    @unittest.skipUnless(shutil.which("node"), "Node is needed to check image recovery")
+    @patch("ui.components.st.iframe")
+    def test_photo_recovery_removes_only_failed_member_images(self, iframe):
+        install_motion_observer()
+        script = iframe.call_args.args[0]
+        function = re.search(r'            function recoverPhoto\(.*?\n            }', script, re.S).group(0)
+        check = function + r"""
+const assert = require('node:assert/strict');
+for (const [matches, complete, width, expected] of [
+    [true, true, 0, true], [true, false, 0, false],
+    [true, true, 180, false], [false, true, 0, false],
+]) {
+    let removed = false;
+    recoverPhoto({matches: () => matches, complete, naturalWidth: width, remove() {removed = true;}});
+    assert.equal(removed, expected);
+}
+recoverPhoto(null);
+recoverPhoto({});
+"""
+        subprocess.run([shutil.which("node"), "-e", check], check=True, capture_output=True, text=True)
+
+    @unittest.skipUnless(shutil.which("node"), "Node is needed to check export recovery")
+    @patch("ui.components.st.iframe")
+    def test_export_recovers_failed_photos_without_hiding_healthy_images(self, iframe):
+        for render, function_name in ((lambda: render_share_controls("test"), "waitForCaptureAssets"),
+                                      (render_stats_controls, "waitForStatsAssets")):
+            render()
+            script = iframe.call_args.args[0]
+            function = re.search(r"        async function " + function_name + r"\(.*?\n        }", script, re.S).group(0)
+            check = r"""
+const assert = require('node:assert/strict');
+const window = {parent: {document: {}, requestAnimationFrame: callback => callback()}};
+const withTimeout = promise => promise;
+""" + function + r"""
+(async () => {
+    for (const [photo, width] of [[true, 0], [false, 0], [true, 180]]) {
+        const image = {complete: true, naturalWidth: width, src: 'original',
+            matches: () => photo, remove() {this.removed = true;}, removeAttribute() {}};
+        await FUNCTION({querySelectorAll: () => [image]});
+        assert.equal(Boolean(image.removed), photo && !width);
+        assert.equal(image.src === 'original', photo || Boolean(width));
+    }
+})().catch(error => {console.error(error); process.exit(1);});
+""".replace("FUNCTION", function_name)
+            subprocess.run([shutil.which("node"), "-e", check], check=True, capture_output=True, text=True)
+
+    @patch("ui.components.st.markdown")
     def test_closed_cards_show_detail_availability_without_purchase_links(self, markdown):
         for available, label in ((True, "Stock remains"), (False, "No stock remaining"),
                                  (None, "Stock unknown")):

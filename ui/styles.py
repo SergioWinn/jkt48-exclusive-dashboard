@@ -683,6 +683,7 @@ div[class*="st-key-filter_date_"] [role="radiogroup"] label:has(input:checked) [
 }
 
 .c-photo-image {
+    grid-area: 1 / 1;
     display: block;
     width: 100%;
     height: 100%;
@@ -693,12 +694,19 @@ div[class*="st-key-filter_date_"] [role="radiogroup"] label:has(input:checked) [
 }
 
 .c-photo-placeholder {
+    grid-area: 1 / 1;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
     background: var(--color-paper-3);
     color: var(--color-muted);
     font-family: var(--font-display);
     font-size: var(--text-sm);
     font-weight: 600;
 }
+
+.c-photo:has(.c-photo-image) .c-photo-placeholder { visibility: hidden; }
 
 .ldp-card.sold .c-photo-image,
 .ldp-card.closed .c-photo-image {
@@ -951,6 +959,11 @@ div[class*="st-key-filter_date_"] [role="radiogroup"] label:has(input:checked) [
 }
 
 .st-key-event_filters [data-testid="stHorizontalBlock"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+@media (max-width: 39.999rem) {
+    .st-key-event_filters [data-testid="stColumn"]:nth-child(-n+2) { grid-column: 1 / -1; }
+}
+
 
 @media (min-width: 40rem) {
     div[class*="st-key-filter_date_"] [role="radiogroup"] { flex-wrap: wrap; overflow-x: visible; padding-bottom: 0; scroll-snap-type: none; }

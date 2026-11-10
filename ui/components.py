@@ -45,8 +45,21 @@ def install_motion_observer():
                 );
             }
 
+            function recoverPhoto(image) {
+                if (image?.matches?.("img.c-photo-image") && image.complete && !image.naturalWidth) {
+                    image.remove();
+                }
+            }
+
+            if (parentWindow.__ex48PhotoErrorListener) {
+                parentDocument.removeEventListener("error", parentWindow.__ex48PhotoErrorListener, true);
+            }
+            parentWindow.__ex48PhotoErrorListener = event => recoverPhoto(event.target);
+            parentDocument.addEventListener("error", parentWindow.__ex48PhotoErrorListener, true);
+
             function sync() {
                 scheduled = false;
+                parentDocument.querySelectorAll("img.c-photo-image").forEach(recoverPhoto);
                 parentDocument.querySelectorAll('[data-testid="stMetric"]').forEach(metric => {
                     const label = metric.querySelector('[data-testid="stMetricLabel"]')?.textContent?.trim();
                     const valueNode = metric.querySelector('[data-testid="stMetricValue"]');
@@ -355,19 +368,20 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
             raw_photo_value = photo_map.get(safe_name_img)
             raw_photo_url = str(raw_photo_value) if raw_photo_value else ""
             
+            initials = ''.join(part[0] for part in member_name.split()[:2]).upper() or '?'
+            photo_image = ""
             if raw_photo_url:
                 proxy_url = f"https://wsrv.nl/?url={quote(raw_photo_url, safe='')}&w=180&h=180&fit=cover&a=top&output=webp"
                 safe_proxy_url = escape(proxy_url, quote=True)
-                img_html = (
-                    f'<div class="c-photo">'
+                photo_image = (
                     f'<img class="c-photo-image" src="{safe_proxy_url}" alt="" aria-hidden="true" '
                     f'width="180" height="180" loading="lazy" crossorigin="anonymous">'
-                    f'</div>'
                 )
-            else:
-                initials = ''.join(part[0] for part in member_name.split()[:2]).upper() or '?'
-                img_html = f'<div class="c-photo c-photo-placeholder" aria-hidden="true">{escape(initials)}</div>'
-                                        
+            img_html = (
+                f'<div class="c-photo" aria-hidden="true">'
+                f'<span class="c-photo-placeholder">{escape(initials)}</span>{photo_image}</div>'
+            )
+
             sales_label = f"<b>{quota_label}&nbsp;LEFT</b>" if cls == "warn" else ""
             if cls == "closed":
                 if m.get("quota_available") is not None or m.get("available_quota") is not None:
@@ -402,7 +416,8 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
                 )
             else: 
                 purchase_aria = escape(
-                    f"Purchase ticket for {member_name}, {sesi_label}, "
+                    f"Purchase ticket for {member_name}, {session_date_label}, {sesi_label}, "
+                    f"{start_time[:5]} - {end_time[:5]}, {jalur_label}, {btn_text}, "
                     f"{quota_label + ' remaining' if has_remaining else 'available'}; opens in a new tab",
                     quote=True,
                 )
@@ -710,8 +725,12 @@ def render_stats_controls(rows_by_tab=None, title="Event statistics", can_share=
                     if (image.decode) await withTimeout(image.decode(), 2500);
                     if (!image.naturalWidth) throw new Error("Empty image");
                 } catch {
-                    image.removeAttribute("crossorigin");
-                    image.src = fallbackPixel;
+                    if (image.matches(".c-photo-image")) {
+                        image.remove();
+                    } else {
+                        image.removeAttribute("crossorigin");
+                        image.src = fallbackPixel;
+                    }
                 }
             }));
         }
@@ -1610,8 +1629,12 @@ def render_share_controls(storage_key, right_px=84):
                     if (image.decode) await withTimeout(image.decode(), 3000);
                     if (!image.naturalWidth) throw new Error("Empty image");
                 } catch {
-                    image.removeAttribute("crossorigin");
-                    image.src = fallbackPixel;
+                    if (image.matches(".c-photo-image")) {
+                        image.remove();
+                    } else {
+                        image.removeAttribute("crossorigin");
+                        image.src = fallbackPixel;
+                    }
                 }
             }));
 

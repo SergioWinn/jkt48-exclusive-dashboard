@@ -397,7 +397,7 @@ else:
 st.markdown(
     """
     <footer class="index-footer">
-        <span>GLOBAL EXCLUSIVE MONITOR · DATA FROM JKT48 PUBLIC API</span>
+        <span>GLOBAL EXCLUSIVE MONITOR</span>
         <span>DEVELOPED BY <a href="https://x.com/estrellawin19" target="_blank" rel="noopener noreferrer">@ESTRELLAWIN19</a></span>
     </footer>
     """,

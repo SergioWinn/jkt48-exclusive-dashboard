@@ -598,6 +598,15 @@ div[class*="st-key-filter_date_"] [role="radiogroup"] label:has(input:checked) [
     color: var(--color-accent-strong);
 }
 
+div[class*="st-key-filter_date_"] [role="radiogroup"] label:hover {
+    color: var(--color-accent-strong);
+}
+
+div[class*="st-key-filter_date_"] [role="radiogroup"] label:has(input:focus-visible) {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+}
+
 /* Session groups and member tickets */
 .stApp h3.session-heading,
 .capture-mode h3.session-heading {
@@ -659,6 +668,20 @@ div[class*="st-key-filter_date_"] [role="radiogroup"] label:has(input:checked) [
 .tako-btn:focus-visible {
     outline: 3px solid var(--color-focus);
     outline-offset: 3px;
+}
+
+[data-testid="stHeaderActionElements"] a[aria-label="Link to heading"] {
+    display: inline-grid;
+    width: 44px;
+    height: 44px;
+    margin: -14px;
+    place-items: center;
+    border-radius: var(--radius-input);
+}
+
+[data-testid="stHeaderActionElements"] a[aria-label="Link to heading"]:focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
 }
 
 .c-identity {

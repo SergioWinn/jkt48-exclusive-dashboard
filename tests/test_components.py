@@ -279,6 +279,8 @@ assert.equal(attrs['aria-labelledby'], undefined);
         self.assertNotIn('classList.add("ex48-reveal")', script)
         self.assertNotIn(".ex48-reveal", GLOBAL_CSS)
         self.assertIn("values.get(key) !== value", script)
+        self.assertIn('label:has(input:focus-visible)', GLOBAL_CSS)
+        self.assertIn('[data-testid="stHeaderActionElements"] a[aria-label="Link to heading"]', GLOBAL_CSS)
         render_share_controls("test")
         capture = iframe.call_args.args[0]
         self.assertIn('image.loading = "eager"', capture)

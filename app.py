@@ -7,7 +7,6 @@ from html import escape
 from pathlib import Path
 
 from core.api import (
-    import_exclusive_snapshot,
     fetch_exclusive_detail,
     get_active_exclusive_events,
     get_member_database,
@@ -73,56 +72,6 @@ if isinstance(admin_keys, str):
 access_key = st.query_params.get("akses", "")
 is_admin = bool(access_key and access_key in admin_keys)
 
-
-def render_json_import(selected_event):
-    if not is_admin:
-        st.error("Hanya admin yang dapat mengimpor data.")
-        return
-    code = selected_event["code"]
-    with st.container(key=f"json_import_{code}"):
-        st.markdown(
-            f"""
-            <section class="json-import-head">
-                <span>ADMIN SNAPSHOT · {escape(code)}</span>
-                <h3>Perbarui data cadangan</h3>
-                <p>Tempel respons API lengkap. Detail wajib; bonus memperbarui ketersediaan tiket.</p>
-            </section>
-            """,
-            unsafe_allow_html=True,
-        )
-        detail_link, bonus_link = st.columns(2)
-        with detail_link:
-            st.link_button("Buka detail ↗", f"https://jkt48.com/api/v1/exclusives/{code}?lang=id",
-                           use_container_width=True)
-        with bonus_link:
-            st.link_button("Buka bonus ↗", f"https://jkt48.com/api/v1/exclusives/{code}/bonus?lang=id",
-                           use_container_width=True)
-        st.caption("Snapshot bertanggal waktu impor, bukan data live. Data lokal dapat hilang saat server di-redeploy.")
-        with st.form(f"import_json_{code}"):
-            detail = st.text_area(
-                "JSON detail (wajib)", height=220, key=f"import_detail_{code}",
-                placeholder='{"status": true, "data": { ... }}',
-                help="Salin seluruh respons dari tautan Detail.",
-            )
-            bonus = st.text_area(
-                "JSON bonus (opsional)", height=140, key=f"import_bonus_{code}",
-                placeholder='{"status": true, "data": [ ... ]}',
-                help="Salin respons dari tautan Bonus bila tersedia.",
-            )
-            submitted = st.form_submit_button("Simpan snapshot lokal", type="primary", use_container_width=True)
-    if submitted:
-        try:
-            snapshot = import_exclusive_snapshot(code, detail, bonus)
-        except (ValueError, OSError) as error:
-            st.error(str(error))
-            return
-        st.session_state[f"event_data_{code}"] = {**selected_event, **snapshot["data"]}
-        st.session_state[f"wr_status_{code}"] = {
-            "is_live": False, "time": snapshot["last_updated"], "reason": "Impor JSON admin",
-        }
-        st.session_state[f"event_fetch_attempt_{code}"] = time.monotonic()
-        st.session_state["snapshot_imported"] = code
-        st.rerun()
 
 def _render_dashboard(
     selected_event,
@@ -194,9 +143,6 @@ def _render_dashboard(
     with st.container(horizontal=True, vertical_alignment="center", key="event_heading"):
         title_slot = st.container()
         with st.container(horizontal=True, vertical_alignment="center", width="content", gap="small", key="event_actions"):
-            if is_admin:
-                with st.popover("Tempel JSON", icon=":material/data_object:"):
-                    render_json_import(selected_event)
             st.markdown(
                 f'<div class="source-readout {source_class}" role="group" aria-label="{source_description}" '
                 f'title="{escape(source_detail, quote=True)}">'
@@ -215,9 +161,6 @@ def _render_dashboard(
         """,
         unsafe_allow_html=True,
     )
-    if st.session_state.pop("snapshot_imported", None) == event_code:
-        st.success("Snapshot JSON tersimpan.")
-
     event_closed = closed
 
     event_stats = calculate_event_stats(event_data, member_metadata)

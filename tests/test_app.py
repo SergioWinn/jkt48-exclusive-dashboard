@@ -1,5 +1,3 @@
-import json
-import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -57,38 +55,20 @@ render_event_cards(event, query, {}, {}, False)
         browser.start()
         self.addCleanup(browser.stop)
 
-    def test_admin_import_replaces_refresh_and_recovers_during_outage(self):
+    def test_admin_role_does_not_show_json_import_controls(self):
         event = {"code": "EXRECOVER", "title": "Recovery event", "category": "DIGITAL_PHOTOBOOK"}
-        detail = {**event, "session": [{"date": "2099-01-01", "start_time": "11:00", "label": "Sesi 1",
-                  "session_detail": [{"label": "1", "jkt48_member_name": "Member", "available_quota": 7}]}]}
-        with tempfile.TemporaryDirectory() as cache, \
-             patch("core.api.RUNTIME_CACHE_DIR", cache), \
-             patch("core.api.get_active_exclusive_events", return_value=[event]), \
+        with patch("core.api.get_active_exclusive_events", return_value=[event]), \
              patch("core.api.get_member_database", return_value=({}, {})), \
-             patch("core.api._get_json", side_effect=LiveApiUnavailable("Cloudflare challenge")):
+             patch("core.api.fetch_exclusive_detail", return_value={**event, "session": []}):
             clear_exclusive_detail_cache()
             app = AppTest.from_file(str(Path(__file__).parents[1] / "app.py"))
             app.secrets["ADMIN_KEYS"] = ["test-key"]
             app.query_params["akses"] = "test-key"
             app.run(timeout=15)
-            self.assertFalse(any(b.key == "manual_refresh" for b in app.button))
-
-            app.text_area(key="import_detail_EXRECOVER").input("not json")
-            next(b for b in app.button if b.label == "Simpan snapshot lokal").click().run(timeout=15)
-            self.assertTrue(app.error)
-            self.assertEqual(list(Path(cache).iterdir()), [])
-            app.text_area(key="import_detail_EXRECOVER").input(json.dumps({"status": True, "data": detail}))
-            next(b for b in app.button if b.label == "Simpan snapshot lokal").click().run(timeout=15)
             self.assertEqual(len(app.exception), 0)
-            self.assertEqual(app.session_state["event_data_EXRECOVER"], detail)
-            self.assertFalse(app.session_state["wr_status_EXRECOVER"]["is_live"])
-            self.assertTrue(any("CACHED DATA" in m.value for m in app.markdown))
-            self.assertEqual(json.loads((Path(cache) / "exclusive_EXRECOVER.json").read_text())["data"], detail)
-            visitor = AppTest.from_file(str(Path(__file__).parents[1] / "app.py")).run(timeout=15)
-            self.assertEqual(len(visitor.exception), 0)
-            self.assertEqual(len(visitor.text_area), 0)
-            self.assertEqual(visitor.session_state["event_data_EXRECOVER"], detail)
-            clear_exclusive_detail_cache()
+            self.assertEqual(len(app.text_area), 0)
+            self.assertFalse(any("Tempel JSON" in button.label for button in app.button))
+            self.assertFalse(any("Simpan snapshot lokal" in button.label for button in app.button))
 
     def test_closed_detail_stops_timer_and_keeps_filters_working(self):
         event = {
@@ -195,7 +175,7 @@ render_event_cards(event, query, {}, {}, False)
                 self.assertIn("Updates automatically", status)
                 self.assertNotIn("<span>Updates automatically</span>", status)
                 self.assertIn("<small>last sync</small>", status)
-                self.assertEqual(app.text_area(key="import_detail_EXTEST").label, "JSON detail (wajib)")
+                self.assertEqual(len(app.text_area), 0)
                 self.assertFalse(any(button.label == "Mitigate Waiting Room" for button in app.button))
 
 

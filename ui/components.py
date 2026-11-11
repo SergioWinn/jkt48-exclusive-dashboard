@@ -30,6 +30,7 @@ def install_motion_observer():
             const values = parentWindow.__ex48MotionValues ?? new Map();
             parentWindow.__ex48MotionValues = values;
             let scheduled = false;
+            let stockValues = parentWindow.__ex48StockValues ?? new Map();
 
             const reducedMotion = parentWindow.matchMedia("(prefers-reduced-motion: reduce)");
 
@@ -57,8 +58,31 @@ def install_motion_observer():
             parentWindow.__ex48PhotoErrorListener = event => recoverPhoto(event.target);
             parentDocument.addEventListener("error", parentWindow.__ex48PhotoErrorListener, true);
 
+            function syncStock() {
+                const cards = parentDocument.querySelectorAll('#laporan-container [data-stock-key]');
+                if (!cards.length) return;
+                const nextValues = new Map();
+                cards.forEach(card => {
+                    const { stockKey: key, stockValue: value } = card.dataset;
+                    nextValues.set(key, value);
+                    if (!stockValues.has(key) || stockValues.get(key) === value) return;
+                    const target = card.querySelector('.c-card-foot');
+                    if (!target || parentDocument.hidden) return;
+                    target.getAnimations().forEach(animation => animation.cancel());
+                    target.animate(
+                        reducedMotion.matches
+                            ? [{ opacity: 0.85 }, { opacity: 1 }]
+                            : [{ filter: 'brightness(1.45)' }, { filter: 'brightness(1)' }],
+                        { duration: reducedMotion.matches ? 120 : 280, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' },
+                    );
+                });
+                stockValues = nextValues;
+                parentWindow.__ex48StockValues = nextValues;
+            }
+
             function sync() {
                 scheduled = false;
+                syncStock();
                 parentDocument.querySelectorAll("img.c-photo-image").forEach(recoverPhoto);
                 parentDocument.querySelectorAll('[data-testid="stMetric"]').forEach(metric => {
                     const label = metric.querySelector('[data-testid="stMetricLabel"]')?.textContent?.trim();
@@ -364,6 +388,9 @@ def render_event_cards(fresh_event_data, search_query, nickname_map, photo_map, 
             else:
                 cls = "avail"
             btn_text = {"closed": "CLOSED", "sold": "SOLD OUT", "warn": "LOW", "avail": "AVAILABLE"}[cls]
+            stock_key = hashlib.sha1(f"{event_id}|{session_identity}|{member_name}|{jalur_label}".encode("utf-8")).hexdigest()
+            stock_value = f"{cls}:{current_quota}" if cls == "warn" else cls
+            share_attributes += f' data-stock-key="{stock_key}" data-stock-value="{stock_value}"'
 
             safe_name_img = member_name.strip().lower()
             raw_photo_value = photo_map.get(safe_name_img)

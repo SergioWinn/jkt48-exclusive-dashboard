@@ -73,6 +73,43 @@ const withTimeout = promise => promise;
 """.replace("FUNCTION", function_name)
             subprocess.run([shutil.which("node"), "-e", check], check=True, capture_output=True, text=True)
 
+    @unittest.skipUnless(shutil.which("node"), "Node is needed to check stock motion")
+    @patch("ui.components.st.iframe")
+    def test_stock_motion_only_marks_changes_and_respects_reduced_motion(self, iframe):
+        install_motion_observer()
+        function = re.search(r"            function syncStock\(.*?\n            }", iframe.call_args.args[0], re.S).group(0)
+        script = r"""
+const assert = require('node:assert/strict');
+let stockValues = new Map(), cards = [], animations = [], cancelled = 0;
+const parentWindow = {}, reducedMotion = {matches: false};
+const parentDocument = {hidden: false, querySelectorAll: () => cards};
+const target = {getAnimations: () => [{cancel() {cancelled++;}}],
+    animate(frames, options) {animations.push({frames, options});}};
+const card = {dataset: {stockKey: 'event-session-member', stockValue: 'avail'}, querySelector: () => target};
+""" + function + r"""
+cards = [card]; syncStock(); syncStock();
+assert.equal(animations.length, 0);
+card.dataset.stockValue = 'warn:4'; syncStock(); syncStock();
+assert.equal(animations.length, 1);
+assert.equal(animations[0].options.duration, 280);
+assert.equal(cancelled, 1);
+reducedMotion.matches = true;
+card.dataset.stockValue = 'warn:3'; syncStock();
+assert.equal(animations[1].options.duration, 120);
+assert.deepEqual(animations[1].frames, [{opacity: .85}, {opacity: 1}]);
+parentDocument.hidden = true;
+card.dataset.stockValue = 'sold'; syncStock();
+parentDocument.hidden = false; syncStock();
+assert.equal(animations.length, 2);
+card.dataset.stockKey = 'different-event'; syncStock();
+assert.equal(animations.length, 2);
+assert.equal(stockValues.size, 1);
+assert.equal(parentWindow.__ex48StockValues, stockValues);
+cards = []; syncStock();
+assert.equal(animations.length, 2);
+"""
+        subprocess.run([shutil.which("node"), "-e", script], check=True, capture_output=True, text=True)
+
     @patch("ui.components.st.markdown")
     def test_closed_cards_show_detail_availability_without_purchase_links(self, markdown):
         for available, label in ((True, "Stock remains"), (False, "No stock remaining"),

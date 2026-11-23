@@ -167,6 +167,34 @@ class ApiResilienceTest(unittest.TestCase):
         self.assertIn("Bonus:", status.call_args.args[3])
         write.assert_not_called()
 
+    @patch("core.api._set_wr_status")
+    @patch("core.api._write_cache")
+    @patch("core.browser_fetch.fetch_event_json")
+    @patch("core.api._get_json")
+    def test_browser_fallback_recovers_detail_and_bonus(self, get_json, browser, write, status):
+        api.clear_exclusive_detail_cache()
+        detail = {"code": "EXBROWSER", "session": [{
+            "date": "2099-01-01", "start_time": "11:00", "session_detail": [{
+                "label": "1", "jkt48_member_name": "Member", "available_quota": 7,
+            }],
+        }]}
+        get_json.side_effect = [api.LiveApiUnavailable("Cloudflare challenge")]
+        browser.return_value = {
+            "detail": {"status": True, "data": detail},
+            "bonus": {"status": True, "data": [{
+                "date": "2099-01-01", "start_time": "11:00", "session_members": [{
+                    "label": "1", "member_name": "Member", "available_quota": 2,
+                }],
+            }]},
+        }
+
+        result = api.fetch_exclusive_detail("EXBROWSER")
+
+        self.assertEqual(result["session"][0]["session_detail"][0]["available_quota"], 2)
+        browser.assert_called_once_with("EXBROWSER", 12)
+        self.assertTrue(status.call_args.args[1])
+        write.assert_called_once()
+
     def tearDown(self):
         api.get_active_exclusive_events.clear()
         api.clear_exclusive_detail_cache()

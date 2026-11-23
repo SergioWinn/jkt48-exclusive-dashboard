@@ -53,7 +53,7 @@ class DetailRefreshIntervalTest(unittest.TestCase):
 
         self.assertEqual(interval, 10)
 
-    def test_cloudflare_challenge_waits_a_minute_before_retrying(self):
+    def test_cloudflare_challenge_waits_thirty_seconds_before_retrying(self):
         interval = get_detail_refresh_interval(
             self.event,
             True,
@@ -61,7 +61,7 @@ class DetailRefreshIntervalTest(unittest.TestCase):
             "Bonus: Cloudflare challenge",
         )
 
-        self.assertEqual(interval, 60)
+        self.assertEqual(interval, 30)
 
     def test_utc_valid_date_to_is_converted_to_wib(self):
         event = {"valid_date_to": "2026-08-01T10:00:00.000Z"}

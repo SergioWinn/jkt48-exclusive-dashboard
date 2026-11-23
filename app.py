@@ -7,9 +7,14 @@ from html import escape
 from pathlib import Path
 
 from core.api import (
+    LiveApiUnavailable,
+    build_jkt48_cookie,
+    clear_exclusive_detail_cache,
     fetch_exclusive_detail,
     get_active_exclusive_events,
     get_member_database,
+    set_jkt48_cookie,
+    validate_jkt48_cookie,
 )
 from core.refresh import get_detail_refresh_interval, is_event_closed
 from core.stats import calculate_event_stats, format_rupiah, has_quantity_data, load_member_metadata, table_rows
@@ -73,6 +78,29 @@ access_key = st.query_params.get("akses", "")
 is_admin = bool(access_key and access_key in admin_keys)
 
 
+def render_waiting_room_cookie_control(event_code):
+    with st.popover("Waiting Room cookie", icon=":material/cookie:"):
+        st.caption("Tempel `__cfwaitingroom_...=value` dari browser. Nilainya tidak ditampilkan kembali.")
+        with st.form(f"waiting_room_cookie_{event_code}", clear_on_submit=True, border=False):
+            candidate = st.text_input(
+                "Waiting Room cookie",
+                type="password",
+                placeholder="__cfwaitingroom_...=value",
+            )
+            submitted = st.form_submit_button("Simpan cookie", type="primary", width="stretch")
+        if submitted:
+            try:
+                cookie = build_jkt48_cookie(candidate)
+                validate_jkt48_cookie(cookie)
+            except (LiveApiUnavailable, ValueError) as error:
+                st.error(f"Cookie belum dapat digunakan: {error}")
+            else:
+                set_jkt48_cookie(cookie)
+                clear_exclusive_detail_cache()
+                st.session_state[f"event_fetch_attempt_{event_code}"] = 0.0
+                st.success("Cookie tersimpan untuk instance dashboard ini.")
+
+
 def _render_dashboard(
     selected_event,
     search_query,
@@ -94,7 +122,9 @@ def _render_dashboard(
         refreshed_codes = {event.get("code") for event in refreshed_events if event.get("code")}
         if refreshed_codes.difference(current_event_codes):
             st.rerun()
-    refresh_interval = get_detail_refresh_interval(event_data, wr_info.get("is_live", True), now_wib)
+    refresh_interval = get_detail_refresh_interval(
+        event_data, wr_info.get("is_live", True), now_wib, wr_info.get("reason", "")
+    )
     last_attempt = st.session_state.get(attempt_state_key, 0.0)
     should_fetch = event_state_key not in st.session_state or (
         (not closed or not wr_info.get("is_live", True)) and time.monotonic() - last_attempt >= refresh_interval
@@ -110,7 +140,9 @@ def _render_dashboard(
     wr_info = st.session_state.get(f"wr_status_{event_code}", {"is_live": True, "time": ""})
     now_wib = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
     closed = is_event_closed(event_data, now_wib)
-    refresh_interval = get_detail_refresh_interval(event_data, wr_info.get("is_live", True), now_wib)
+    refresh_interval = get_detail_refresh_interval(
+        event_data, wr_info.get("is_live", True), now_wib, wr_info.get("reason", "")
+    )
     has_event_detail = isinstance(event_data.get("session"), list)
     bonus_cached = bool(has_event_detail and wr_info.get("is_live") and wr_info.get("reason"))
 
@@ -143,6 +175,8 @@ def _render_dashboard(
     with st.container(horizontal=True, vertical_alignment="center", key="event_heading"):
         title_slot = st.container()
         with st.container(horizontal=True, vertical_alignment="center", width="content", gap="small", key="event_actions"):
+            if is_admin:
+                render_waiting_room_cookie_control(event_code)
             st.markdown(
                 f'<div class="source-readout {source_class}" role="group" aria-label="{source_description}" '
                 f'title="{escape(source_detail, quote=True)}">'

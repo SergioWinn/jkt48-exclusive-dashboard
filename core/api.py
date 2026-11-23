@@ -219,12 +219,25 @@ def _is_cloudflare_gate_response(response):
     return response.headers.get("cf-mitigated") == "challenge" or "just a moment" in body_start or "cf-chl" in body_start
 
 
+def _refresh_waiting_room_cookie(response):
+    try:
+        cookies = response.cookies.items()
+        for name, value in cookies:
+            if str(name).startswith("__cfwaitingroom"):
+                set_jkt48_cookie(build_jkt48_cookie(f"{name}={value}"))
+                return
+    except (AttributeError, TypeError, ValueError):
+        return
+
+
 def _http_get(url, timeout):
     global _waiting_room_detected
     response = _send_http_get(url, timeout, FALLBACK_HEADERS)
+    _refresh_waiting_room_cookie(response)
     _waiting_room_detected = _is_cloudflare_gate_response(response)
     if _waiting_room_detected and (cookie := get_jkt48_cookie()):
         response = _send_http_get(url, timeout, {**FALLBACK_HEADERS, "Cookie": cookie})
+        _refresh_waiting_room_cookie(response)
     return response
 
 

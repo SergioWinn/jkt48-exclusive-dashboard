@@ -70,6 +70,28 @@ render_event_cards(event, query, {}, {}, False)
             self.assertFalse(any("Tempel JSON" in button.label for button in app.button))
             self.assertFalse(any("Simpan snapshot lokal" in button.label for button in app.button))
 
+    def test_admin_can_set_waiting_room_cookie(self):
+        event = {"code": "EXCOOKIE", "title": "Cookie event", "category": "DIGITAL_PHOTOBOOK"}
+        cookie = "__cfwaitingroom_example=valid-value"
+        with patch("core.api.get_active_exclusive_events", return_value=[event]), \
+             patch("core.api.get_member_database", return_value=({}, {})), \
+             patch("core.api.fetch_exclusive_detail", return_value={**event, "session": []}), \
+             patch("core.api.validate_jkt48_cookie") as validate, \
+             patch("core.api.set_jkt48_cookie") as save, \
+             patch("core.api.clear_exclusive_detail_cache") as clear:
+            app = AppTest.from_file(str(Path(__file__).parents[1] / "app.py"))
+            app.secrets["ADMIN_KEYS"] = ["test-key"]
+            app.query_params["akses"] = "test-key"
+            app.run(timeout=15)
+            cookie_input = next(input_ for input_ in app.text_input if input_.label == "Waiting Room cookie")
+
+            cookie_input.input(cookie)
+            next(button for button in app.button if button.label == "Simpan cookie").click().run(timeout=15)
+
+            validate.assert_called_once_with(cookie)
+            save.assert_called_once_with(cookie)
+            clear.assert_called_once()
+
     def test_closed_detail_stops_timer_and_keeps_filters_working(self):
         event = {
             "code": "EXCLOSED",

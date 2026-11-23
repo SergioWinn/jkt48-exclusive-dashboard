@@ -13,6 +13,7 @@ from core.api import (
     clear_exclusive_detail_cache,
     fetch_exclusive_detail,
     get_active_exclusive_events,
+    get_jkt48_cookie,
     get_member_database,
     is_waiting_room_detected,
     set_jkt48_cookie,
@@ -78,6 +79,24 @@ class GetActiveExclusiveEventsTest(unittest.TestCase):
 
         self.assertNotIn("Cookie", get.call_args.kwargs["headers"])
         self.assertFalse(is_waiting_room_detected())
+
+    @patch("core.api.USING_BROWSER_CLIENT", False)
+    @patch("core.api.browser_requests.Session.get")
+    def test_waiting_room_cookie_is_refreshed_from_response(self, get):
+        waiting_room = Mock(
+            status_code=200,
+            headers={"content-type": "text/html"},
+            text="Cloudflare Waiting Room",
+            cookies={"__cfwaitingroom_current": "renewed"},
+        )
+        live_api = Mock(status_code=200, headers={"content-type": "application/json"}, text="{}", cookies={})
+        get.side_effect = [waiting_room, live_api]
+        set_jkt48_cookie("__cfwaitingroom_current=expired")
+
+        _http_get("https://jkt48.com/api/v1/members", 15)
+
+        self.assertEqual(get.call_args_list[1].kwargs["headers"]["Cookie"], "__cfwaitingroom_current=renewed")
+        self.assertEqual(get_jkt48_cookie(), "__cfwaitingroom_current=renewed")
 
     def test_waiting_room_cookie_value_builds_the_request_header(self):
         self.assertEqual(build_jkt48_cookie(" waiting== "), f"{WAITING_ROOM_COOKIE_NAME}=waiting==")

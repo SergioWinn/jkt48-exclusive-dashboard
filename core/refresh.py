@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 ACTIVE_REFRESH_SECONDS = 5
 RECOVERY_REFRESH_SECONDS = 10
+CLOUDFLARE_RETRY_SECONDS = 60
 CLOSED_REFRESH_SECONDS = 3600
 
 
@@ -38,7 +39,10 @@ def is_event_closed(event, now_wib):
     return bool(end_date and now_wib >= end_date)
 
 
-def get_detail_refresh_interval(event, is_live, now_wib):
+def get_detail_refresh_interval(event, is_live, now_wib, reason=""):
+    if "Cloudflare challenge" in reason or "Cloudflare Waiting Room" in reason:
+        return CLOUDFLARE_RETRY_SECONDS
+
     if not is_live:
         return RECOVERY_REFRESH_SECONDS
 

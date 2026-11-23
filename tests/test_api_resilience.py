@@ -195,7 +195,41 @@ class ApiResilienceTest(unittest.TestCase):
         self.assertTrue(status.call_args.args[1])
         write.assert_called_once()
 
+    @patch("core.api._write_cache")
+    @patch("core.browser_fetch.fetch_event_json")
+    @patch("core.api._get_json")
+    def test_cloudflare_switches_future_refreshes_to_browser_mode(self, get_json, browser, _write):
+        from core.browser_fetch import clear_browser_modes
+
+        clear_browser_modes()
+        api.clear_exclusive_detail_cache()
+        detail = {"code": "EXBMODE", "session": [{
+            "date": "2099-01-01", "start_time": "11:00", "session_detail": [],
+        }]}
+        browser.return_value = {
+            "detail": {"status": True, "data": detail},
+            "bonus": {"status": True, "data": [{
+                "date": "2099-01-01", "start_time": "11:00", "session_members": [{
+                    "label": "1", "member_name": "Member", "available_quota": 2,
+                }],
+            }]},
+        }
+        get_json.side_effect = [api.LiveApiUnavailable("Cloudflare challenge")]
+
+        first_result = api.fetch_exclusive_detail("EXBMODE")
+        self.assertEqual(first_result["session"][0]["session_detail"][0]["available_quota"], 2)
+        api.clear_exclusive_detail_cache()
+        get_json.reset_mock()
+        second_result = api.fetch_exclusive_detail("EXBMODE")
+        self.assertEqual(second_result["session"][0]["session_detail"][0]["available_quota"], 2)
+
+        get_json.assert_not_called()
+        self.assertEqual(browser.call_count, 2)
+
     def tearDown(self):
+        from core.browser_fetch import clear_browser_modes
+
+        clear_browser_modes()
         api.get_active_exclusive_events.clear()
         api.clear_exclusive_detail_cache()
 

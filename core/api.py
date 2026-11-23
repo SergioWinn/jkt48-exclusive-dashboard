@@ -498,17 +498,31 @@ def _fetch_exclusive_detail_shared(code):
     waktu_sekarang = now_wib.strftime('%d/%m/%Y %H:%M:%S WIB')
     is_live, reason, time_label = True, "", waktu_sekarang
     browser_payloads = None
+    browser_mode = False
     try:
-        data = _validate_detail(_get_json(url, 12).get("data"), code)
-        print(f"[sync] event={code} detail=OK", flush=True)
-    except LiveApiUnavailable as error:
-        from core.browser_fetch import fetch_event_json
+        from core.browser_fetch import enable_browser_mode, fetch_event_json, use_browser_mode
 
-        browser_payloads = fetch_event_json(code, 12)
-        try:
+        browser_mode = use_browser_mode(code)
+        if browser_mode:
+            browser_payloads = fetch_event_json(code, 12)
             data = _validate_detail(browser_payloads.get("detail", {}).get("data"), code)
             print(f"[sync] event={code} detail=OK source=BROWSER", flush=True)
-        except (AttributeError, LiveApiUnavailable):
+        else:
+            data = _validate_detail(_get_json(url, 12).get("data"), code)
+            print(f"[sync] event={code} detail=OK", flush=True)
+    except LiveApiUnavailable as error:
+        if not browser_mode and _sync_error_label(error) in ("Cloudflare challenge", "Cloudflare Waiting Room"):
+            enable_browser_mode(code)
+            browser_mode = True
+            browser_payloads = fetch_event_json(code, 12)
+            try:
+                data = _validate_detail(browser_payloads.get("detail", {}).get("data"), code)
+                print(f"[sync] event={code} detail=OK source=BROWSER", flush=True)
+            except (AttributeError, LiveApiUnavailable):
+                pass
+            else:
+                error = None
+        if error:
             print(f"[sync] event={code} detail=FAILED reason={_sync_error_label(error)}", flush=True)
             is_live, reason = False, str(error)
             cache_payload = _read_latest_cache(cache_file, bundled_cache_file)
@@ -527,15 +541,18 @@ def _fetch_exclusive_detail_shared(code):
         bonus = (browser_payloads or {}).get("bonus")
         if not (isinstance(bonus, dict) and bonus.get("status") is True
                 and isinstance(bonus.get("data"), list)):
-            try:
-                bonus = _get_json(bonus_url, 12)
-            except LiveApiUnavailable:
-                from core.browser_fetch import fetch_event_json
+            if browser_mode:
+                bonus = None
+            else:
+                try:
+                    bonus = _get_json(bonus_url, 12)
+                except LiveApiUnavailable:
+                    from core.browser_fetch import fetch_event_json
 
-                browser_payloads = browser_payloads or fetch_event_json(code, 12)
-                bonus = browser_payloads.get("bonus")
-                if not isinstance(bonus, dict) or bonus.get("status") is not True:
-                    raise
+                    browser_payloads = browser_payloads or fetch_event_json(code, 12)
+                    bonus = browser_payloads.get("bonus")
+            if not isinstance(bonus, dict) or bonus.get("status") is not True:
+                raise LiveApiUnavailable("Browser fallback unavailable")
         if (bonus.get("data") == [] and is_live and data
                 and isinstance(data.get("session"), list) and is_event_closed(data, now_wib)):
             print(f"[sync] event={code} bonus=EMPTY sales=CLOSED source=DETAIL", flush=True)
